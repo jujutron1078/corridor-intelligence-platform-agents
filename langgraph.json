@@ -1,0 +1,13 @@
+{
+  "graphs": {
+    "grant_writer": "src/agents/grant_writer/agent.py:agent"
+  },
+  "dependencies": [
+    "."
+  ],
+  "env": "./.env",
+  "python_version": "3.13",
+  "http": {
+    "app": "src/api/main.py:app"
+  }
+}
