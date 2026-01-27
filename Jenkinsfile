@@ -2,7 +2,7 @@
 
 dockerPipeline(
     // Required Configuration
-    dockerImage: 'bayes_grant_writer_agent',
+    dockerImage: ' ms-grant-writer-agent',
     appPort: '8000',
     
     // Project & Technology
@@ -13,7 +13,7 @@ dockerPipeline(
     deployTo: 'kubernetes',
     
     // Infisical Secrets
-    infisicalPath: '/bayes_grant_writer_agent/',
+    infisicalPath: '/ms-grant-writer-agent/',
     
     // Override health check timeout (default is 5 minutes, reduce to 1 for faster feedback)
     healthCheckTimeout: 1
