@@ -2,7 +2,7 @@
 
 dockerPipeline(
     // Required Configuration
-    dockerImage: ' ms-grant-writer-agent',
+    dockerImage: 'ms-grant-writer-agent',
     appPort: '8000',
     
     // Project & Technology
