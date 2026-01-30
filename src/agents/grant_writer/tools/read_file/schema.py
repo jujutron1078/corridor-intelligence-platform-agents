@@ -10,26 +10,34 @@ class ReadFileInput(BaseModel):
     question: str = Field(
         description="The user's question about the artifacts. This can be a question to answer, or a request to edit a document."
     )
+    file_id: str = Field(
+        description="The ID of the file to read. This is the ID of the file that the user wants to read."
+    )
 
 
 class ReadFileOutput(BaseModel):
     """
     The output schema for the read_file tool.
     """
-    action: Literal["provide_response", "edit"] = Field(
-        description=(
-            "The action to take based on the user's request:\n"
-            "- 'provide_response': User asked a question, just provide an answer\n"
-            "- 'edit': User wants to edit a document, identify which artifact needs editing"
-        )
+
+    is_file_relevant_to_question: bool = Field(
+        description="True if file helps answer question or needs editing. False otherwise."
     )
 
-    response: Optional[str] = Field(
-        description="The answer to the user's question or the response about what action will be taken. If action is edit respond with file artifact names that need to be edited."
+    needs_editing: bool = Field(
+        description="True if this artifact needs editing per user's request. False for uploaded docs (read-only) or informational queries."
     )
-    
-    artifact_id: Optional[list[str]] = Field(
-        default=[],
-        description="The IDs of the artifacts that need to be edited. Required when action is 'edit'."
+
+    how_to_use_file: Optional[str] = Field(
+        description="""How to use this file. None if not relevant.
+
+For info extraction: What to extract | How to interpret | How to use | Context
+For editing: What to edit | Why | How | Impact
+
+Example (info): "EXTRACT: Deadline 'March 15, 2025' from Section 2.3 | Hard deadline, timezone EAT | Use as submission target | Late = auto-reject"
+
+Example (edit): "EDIT: Timeline '4 months' → '6 months' | User extending duration | Update Summary, Work Plan, Gantt | Also update Financial Proposal"
+
+Be concise and actionable.
+"""
     )
-    

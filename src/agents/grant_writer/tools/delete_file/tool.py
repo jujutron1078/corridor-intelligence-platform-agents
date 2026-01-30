@@ -9,20 +9,20 @@ from .description import TOOL_DESCRIPTION
 @tool(description=TOOL_DESCRIPTION)
 def delete_file(payload: DeleteFileInput, runtime: ToolRuntime) -> Command:
     """
-    Delete one or more artifacts (generated documents) from the state.
+    Delete a single artifact (generated document) from the state.
     
-    Removes the specified artifacts from the artifacts list in the state.
+    Removes the specified artifact from the artifacts list in the state.
     """
     tool_call_id = runtime.tool_call_id
-    artifact_ids = payload.artifact_ids
+    artifact_id = payload.artifact_id
     
     # Validate input
-    if not artifact_ids:
+    if not artifact_id:
         return Command(
             update={
                 "messages": [
                     ToolMessage(
-                        content="No artifact IDs provided. Please provide at least one artifact ID to delete.",
+                        content="No artifact ID provided. Please provide an artifact ID to delete.",
                         tool_call_id=tool_call_id,
                     ),
                 ],
@@ -44,13 +44,12 @@ def delete_file(payload: DeleteFileInput, runtime: ToolRuntime) -> Command:
         )
     
     # Track results
-    artifact_ids_set = set(artifact_ids)
     deleted_artifacts = []
     remaining_artifacts = []
     
     # Separate deleted from remaining
     for artifact in artifacts:
-        if artifact.get("id") in artifact_ids_set:
+        if artifact.get("id") == artifact_id:
             deleted_artifacts.append(artifact.get("document_name", "Unknown"))
         else:
             remaining_artifacts.append(artifact)
@@ -69,13 +68,23 @@ def delete_file(payload: DeleteFileInput, runtime: ToolRuntime) -> Command:
             }
         )
     
-    # Get current edits and filter out edits associated with deleted artifacts
-    edits = runtime.state.get("edits", [])
-    remaining_edits = [
-        edit for edit in edits 
-        if edit.get("artifact_id") not in artifact_ids_set
-    ]
-    deleted_edits_count = len(edits) - len(remaining_edits)
+    # Get current edits (grouped by artifact) and drop deleted artifacts' edits
+    artifact_edits = runtime.state.get("artifact_edits", []) or []
+    if not isinstance(artifact_edits, list):
+        artifact_edits = []
+
+    deleted_edits_count = 0
+    remaining_artifact_edits = []
+    for entry in artifact_edits:
+        if not isinstance(entry, dict):
+            continue
+        aid = entry.get("artifact_id")
+        if aid == artifact_id:
+            edits = entry.get("edits", [])
+            if isinstance(edits, list):
+                deleted_edits_count += len(edits)
+            continue
+        remaining_artifact_edits.append(entry)
     
     # Success case
     deleted_count = len(deleted_artifacts)
@@ -100,6 +109,6 @@ def delete_file(payload: DeleteFileInput, runtime: ToolRuntime) -> Command:
                 ),
             ],
             "artifacts": remaining_artifacts,  # Update state with filtered list
-            "edits": remaining_edits,  # Update state with filtered edits
+            "artifact_edits": {"op": "replace", "items": remaining_artifact_edits},
         }
     )
