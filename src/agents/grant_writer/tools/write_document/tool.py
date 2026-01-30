@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 
 from langchain.tools import tool, ToolRuntime
@@ -6,6 +5,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 from langchain.chat_models import init_chat_model
 
+from src.shared.utils.doc_ids import make_artifact_id
 from .schema import WriteDocumentInput
 from .description import TOOL_DESCRIPTION
 from .prompt import AGENT_PROMPT
@@ -33,7 +33,13 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
 
     tool_call_id = runtime.tool_call_id
 
-    doc_id = f"doc-{uuid.uuid4()}"
+    # Use artifact-{type}-{short_id} format (e.g. artifact-technical-proposal-a1b2c3d4)
+    if payload.generation_mode == "open_generation":
+        doc_id = make_artifact_id(payload.document_type or "document")
+    elif payload.generation_mode == "fill_template":
+        doc_id = make_artifact_id(payload.document_name or "document")
+    else:
+        doc_id = make_artifact_id("document")
     progress = ProgressTracker(runtime.stream_writer, doc_id, payload.document_name)
 
     # Get the document id and check if it exists in the state
@@ -74,9 +80,9 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         progress.update("Retrieving reference documents...")
         docs_index = get_documents_index(runtime)
         reference_docs = [
-            resolve_doc(docs_index, doc_id)
-            for doc_id in payload.reference_document_ids
-            if resolve_doc(docs_index, doc_id)
+            resolve_doc(docs_index, ref_id)
+            for ref_id in payload.reference_document_ids
+            if resolve_doc(docs_index, ref_id)
         ]
 
         progress.update(f"Processing {len(reference_docs)} reference document(s)...")
@@ -163,9 +169,6 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         # get the tone
         tone = payload.tone
 
-        # get the next document to generate
-        next_document_to_generate = payload.next_document_to_generate
-
         # Get company context (loaded at module init from all company_info files)
         progress.update("Loading company context...")
         company_context = get_company_context()
@@ -222,7 +225,7 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
             update={
                 "artifacts": updated_artifacts,
                 "messages": [
-                    ToolMessage(content=f"Document {document_name} generated successfully., the next document to generate is {next_document_to_generate}", tool_call_id=tool_call_id),
+                    ToolMessage(content=f"Document {document_name} generated successfully.", tool_call_id=tool_call_id),
                 ],
             }
         )
@@ -274,9 +277,9 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         # Get the reference documents to use during generation
         progress.update("Retrieving reference documents for template filling...")
         reference_docs = [
-            resolve_doc(docs_index, doc_id)
-            for doc_id in payload.reference_document_ids
-            if resolve_doc(docs_index, doc_id)
+            resolve_doc(docs_index, ref_id)
+            for ref_id in payload.reference_document_ids
+            if resolve_doc(docs_index, ref_id)
         ]
 
         progress.update(f"Processing {len(reference_docs)} reference document(s) for template filling...")
@@ -348,7 +351,6 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         must_not_include = payload.must_not_include
         audience = payload.audience
         tone = payload.tone
-        next_document_to_generate = payload.next_document_to_generate
 
         # Get company context
         progress.update("Loading company context for template filling...")
@@ -407,7 +409,7 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
             update={
                 "artifacts": updated_artifacts,
                 "messages": [
-                    ToolMessage(content=f"Document {document_name} generated successfully. The next document to generate is {next_document_to_generate}", tool_call_id=tool_call_id),
+                    ToolMessage(content=f"Document {document_name} generated successfully.", tool_call_id=tool_call_id),
                 ],
             }
         )

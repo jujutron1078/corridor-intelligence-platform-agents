@@ -37,7 +37,7 @@ The agent supports multiple organizations (Bayes, Verst Carbon, Ignis Innovation
   - **Open Generation**: Creates documents from scratch using internal templates and reference documents
   - **Fill Template**: Fills uploaded forms and templates with required information
 - **Document Querying**: Answers questions about generated documents and identifies what needs editing
-- **Document Editing**: Creates targeted edits with approval workflow - edits are reviewed before applying
+- **Document Editing**: Creates targeted edits with approval workflow - edits are reviewed before applying (grouped per artifact)
 - **Document Management**: Delete generated documents and manage artifacts
 - **Company Information**: Retrieves organization details, team CVs, past projects, and credentials
 - **Task Management**: Creates and manages task lists with automatic progression through pending tasks

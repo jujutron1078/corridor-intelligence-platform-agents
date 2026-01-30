@@ -1,11 +1,11 @@
 from typing import Optional
-import uuid
 
 from langchain.tools import tool, ToolRuntime
 from langchain_core.messages import ToolMessage, HumanMessage
 from langgraph.types import Command
 
 from src.shared.schema.document_schema import Document
+from src.shared.utils.doc_ids import make_doc_id
 from .description import THINK_TOOL_DESCRIPTION
 from .utils import extract_uploaded_files_from_message, replace_file_blocks_with_document_summary
 
@@ -57,7 +57,9 @@ def think_tool(
     for i, doc in enumerate(normalized_documents):
         if i < len(uploaded_files):
             uploaded = uploaded_files[i]
-            doc.id = doc.id or f"doc-{uuid.uuid4()}"
+            # Use doc-{type}-{short_id} format; prefer document_type, else primary_category (e.g. doc-rfp-a1b2c3d4)
+            type_for_id = getattr(doc, "document_type", None) or getattr(doc, "primary_category", None) or "OTHER"
+            doc.id = doc.id or make_doc_id(type_for_id)
             # Always trust the system-extracted filename as the final filename
             doc.file_name = (uploaded.get("filename") or "") or doc.file_name
             doc.file_data = doc.file_data or (uploaded.get("file_data") or "")

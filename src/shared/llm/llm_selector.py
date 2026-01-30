@@ -4,7 +4,6 @@ from langchain.agents.middleware import wrap_model_call, ModelResponse
 
 default_llm = init_chat_model(
     "openai:gpt-5.2",
-    model_kwargs={"parallel_tool_calls": False},
 )
 
 
@@ -19,7 +18,6 @@ async def dynamic_model_selector(request: ModelRequest, handler) -> ModelRespons
     # Convert the model string (e.g., "openai:gpt-4o-mini") to an actual model object
     request.model = init_chat_model(
         preferred_llm,
-        model_kwargs={"parallel_tool_calls": False},
     )
 
     return await handler(request)
