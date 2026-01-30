@@ -33,6 +33,122 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
 
     tool_call_id = runtime.tool_call_id
 
+    existing_artifacts = runtime.state.get("artifacts", []) or []
+    if not isinstance(existing_artifacts, list):
+        existing_artifacts = []
+
+    def _find_artifact_by_id(aid: str) -> dict | None:
+        if not aid:
+            return None
+        for a in existing_artifacts:
+            if isinstance(a, dict) and a.get("id") == aid:
+                return a
+        return None
+
+    def _logical_document_id(artifact: dict) -> str:
+        # Backwards-compatible: older artifacts may not have document_id.
+        return artifact.get("document_id") or artifact.get("id") or ""
+
+    # Resolve regeneration context (optional)
+    regen_document_id: str | None = None
+    regen_parent_artifact: dict | None = None
+    regen_parent_id: str | None = None
+
+    if payload.regenerate_from_artifact_id:
+        regen_parent_artifact = _find_artifact_by_id(payload.regenerate_from_artifact_id)
+        if not regen_parent_artifact:
+            available_ids = [a.get("id", "unknown") for a in existing_artifacts if isinstance(a, dict)]
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content=(
+                                f"Artifact with ID '{payload.regenerate_from_artifact_id}' not found. "
+                                f"Available artifact IDs: {', '.join(available_ids) if available_ids else 'none'}"
+                            ),
+                            tool_call_id=tool_call_id,
+                        )
+                    ],
+                }
+            )
+        regen_document_id = _logical_document_id(regen_parent_artifact) or regen_parent_artifact.get("id")
+        regen_parent_id = regen_parent_artifact.get("id")
+
+    elif payload.regenerate_document_id:
+        regen_document_id = payload.regenerate_document_id
+
+        # Find candidates by document_id; also support older artifacts where document_id wasn't set (treat id as doc id).
+        candidates: list[dict] = []
+        for a in existing_artifacts:
+            if not isinstance(a, dict):
+                continue
+            if a.get("document_id") == regen_document_id or a.get("id") == regen_document_id:
+                candidates.append(a)
+
+        if not candidates:
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            content=f"No artifacts found for document_id '{regen_document_id}'.",
+                            tool_call_id=tool_call_id,
+                        )
+                    ],
+                }
+            )
+
+        if payload.regenerate_from_version is not None:
+            for a in candidates:
+                if a.get("version") == payload.regenerate_from_version:
+                    regen_parent_artifact = a
+                    break
+            if not regen_parent_artifact:
+                available_versions = sorted(
+                    {int(a.get("version")) for a in candidates if isinstance(a.get("version"), int)}
+                )
+                return Command(
+                    update={
+                        "messages": [
+                            ToolMessage(
+                                content=(
+                                    f"Version {payload.regenerate_from_version} not found for document_id '{regen_document_id}'. "
+                                    f"Available versions: {', '.join(map(str, available_versions)) if available_versions else 'none'}"
+                                ),
+                                tool_call_id=tool_call_id,
+                            )
+                        ],
+                    }
+                )
+        else:
+            # Default: regenerate from latest version
+            regen_parent_artifact = max(
+                candidates,
+                key=lambda a: int(a.get("version") or 0) if isinstance(a.get("version"), int) else 0,
+            )
+
+        regen_parent_id = regen_parent_artifact.get("id") if regen_parent_artifact else None
+
+    # Backfill existing artifacts in the family with document_id when regenerating
+    updated_existing_artifacts: list[dict] = []
+    next_version = 1
+    if regen_document_id:
+        max_version = 0
+        for a in existing_artifacts:
+            if not isinstance(a, dict):
+                continue
+            in_family = a.get("document_id") == regen_document_id or a.get("id") == regen_document_id
+            if in_family:
+                v = a.get("version")
+                if isinstance(v, int) and v > max_version:
+                    max_version = v
+                if not a.get("document_id"):
+                    a = {**a, "document_id": regen_document_id}
+            updated_existing_artifacts.append(a)
+        next_version = max_version + 1
+    else:
+        updated_existing_artifacts = [a for a in existing_artifacts if isinstance(a, dict)]
+        next_version = 1
+
     # Use artifact-{type}-{short_id} format (e.g. artifact-technical-proposal-a1b2c3d4)
     if payload.generation_mode == "open_generation":
         doc_id = make_artifact_id(payload.document_type or "document")
@@ -209,23 +325,27 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         generated_document = response.content
         progress.update("Document generation completed successfully!")
         
-        # Get existing artifacts and append the new one
-        existing_artifacts = runtime.state.get("artifacts", [])
+        # Append the new artifact (and preserve any backfilled document_id changes)
         new_artifact = {
             "id": doc_id,
+            "document_id": regen_document_id or doc_id,
+            "parent_id": regen_parent_id,
             "document_name": document_name,
             "content": generated_document,
             "timestamp": datetime.now().isoformat(),
-            "version": 1,
+            "version": next_version,
             "approved": False,
         }
-        updated_artifacts = existing_artifacts + [new_artifact]
+        updated_artifacts = updated_existing_artifacts + [new_artifact]
         
         return Command(
             update={
                 "artifacts": updated_artifacts,
                 "messages": [
-                    ToolMessage(content=f"Document {document_name} generated successfully.", tool_call_id=tool_call_id),
+                    ToolMessage(
+                        content=f"Document {document_name} generated successfully (v{next_version}).",
+                        tool_call_id=tool_call_id,
+                    ),
                 ],
             }
         )
@@ -393,23 +513,27 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         generated_document = response.content
         progress.update("Template filling completed successfully!")
         
-        # Get existing artifacts and append the new one
-        existing_artifacts = runtime.state.get("artifacts", [])
+        # Append the new artifact (and preserve any backfilled document_id changes)
         new_artifact = {
             "id": doc_id,
+            "document_id": regen_document_id or doc_id,
+            "parent_id": regen_parent_id,
             "document_name": document_name,
             "content": generated_document,
             "timestamp": datetime.now().isoformat(),
-            "version": 1,
+            "version": next_version,
             "approved": False,
         }
-        updated_artifacts = existing_artifacts + [new_artifact]
+        updated_artifacts = updated_existing_artifacts + [new_artifact]
         
         return Command(
             update={
                 "artifacts": updated_artifacts,
                 "messages": [
-                    ToolMessage(content=f"Document {document_name} generated successfully.", tool_call_id=tool_call_id),
+                    ToolMessage(
+                        content=f"Document {document_name} generated successfully (v{next_version}).",
+                        tool_call_id=tool_call_id,
+                    ),
                 ],
             }
         )

@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional
 
 
 class EditFileInput(BaseModel):
@@ -6,7 +7,30 @@ class EditFileInput(BaseModel):
     The input schema for the edit_file tool.
     """
 
-    artifact_id: str = Field(description="The ID of the artifact (document) to edit.")
+    artifact_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional. The ID of the specific artifact (document version) to edit. "
+            "If provided, takes precedence over document_id/from_version."
+        ),
+    )
+
+    document_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional. Stable logical document identifier shared across versions. "
+            "If provided (and artifact_id is omitted), the latest version will be edited by default."
+        ),
+    )
+
+    from_version: Optional[int] = Field(
+        default=None,
+        description=(
+            "Optional. When editing by document_id, choose which version to edit. "
+            "If omitted, the latest version is used."
+        ),
+    )
+
     edit_instructions: str = Field(
         description=(
             "Detailed instructions for what changes to make to the document. "
@@ -14,6 +38,14 @@ class EditFileInput(BaseModel):
             "and any formatting requirements."
         )
     )
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "EditFileInput":
+        if not self.artifact_id and not self.document_id:
+            raise ValueError("Provide either artifact_id or document_id")
+        if self.from_version is not None and self.from_version < 1:
+            raise ValueError("from_version must be >= 1")
+        return self
 
 
 class PendingEdit(BaseModel):

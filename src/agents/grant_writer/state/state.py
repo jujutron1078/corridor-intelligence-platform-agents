@@ -8,6 +8,11 @@ from src.shared.schema.document_schema import Document
 class Artifact(TypedDict):
     """Generated document artifact with metadata."""
     id: str
+    # Stable identifier for the logical document across versions.
+    # For v1, this is set to the artifact's own id. Subsequent versions share the same document_id.
+    document_id: NotRequired[str]
+    # The artifact id this version was regenerated from (if any).
+    parent_id: NotRequired[str]
     document_name: str
     content: str
     timestamp: str

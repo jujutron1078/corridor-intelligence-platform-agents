@@ -29,6 +29,11 @@ def read_file(payload: ReadFileInput, runtime: ToolRuntime) -> Command:
 
     # Get all artifacts from state
     artifacts = runtime.state.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        artifacts = []
+
+    def _is_int(v) -> bool:
+        return isinstance(v, int)
 
     artifact = None
     if artifacts:
@@ -36,6 +41,19 @@ def read_file(payload: ReadFileInput, runtime: ToolRuntime) -> Command:
             if art.get("id") == file_id:
                 artifact = art
                 break
+        # If not found by artifact id, allow reading by stable document_id (latest version).
+        if artifact is None:
+            candidates = [
+                a
+                for a in artifacts
+                if isinstance(a, dict)
+                and (a.get("document_id") == file_id or a.get("id") == file_id)
+            ]
+            if candidates:
+                artifact = max(
+                    candidates,
+                    key=lambda a: int(a.get("version") or 0) if _is_int(a.get("version")) else 0,
+                )
 
     # If the file_id is an artifact, build the content block for the artifact
     if artifact is not None:

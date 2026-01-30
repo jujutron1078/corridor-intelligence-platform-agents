@@ -3,6 +3,8 @@ Write a complete, final document based on gathered structured context.
 
 Use this tool when you want to generate a full final document in ONE call.
 
+This tool also supports **regenerating** a document: creating a new version (v2, v3, ...) of an existing generated artifact while keeping a stable logical document id.
+
 **Generation Modes:**
 
 - **open_generation** (default): Use when you need to generate a document (e.g. technical proposal, concept note, cover letter) but:
@@ -31,6 +33,9 @@ Use this tool when you want to generate a full final document in ONE call.
 - `template_document_id`: The ID of the uploaded template document to fill
 
 **Optional parameters:**
+- `regenerate_document_id`: Stable logical document id to regenerate (creates a new version)
+- `regenerate_from_version`: Which version to regenerate from (defaults to latest when regenerating)
+- `regenerate_from_artifact_id`: Regenerate from a specific artifact id (takes precedence)
 - `reference_document_ids`: Documents to use as evidence/source material
 - `constraints`, `must_include`, `must_not_include`: Content rules
 - `audience`, `tone`: Style guidance

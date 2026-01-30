@@ -31,6 +31,8 @@ Edit an existing document (artifact) based on user instructions. Call once per a
 - If the same text appears multiple times, separate edits are created or context is included to target specific occurrences
 
 **Args:**
-    artifact_id: The ID of the artifact to edit (one artifact per call)
+    artifact_id: Optional. The ID of the specific artifact version to edit (one artifact per call). Takes precedence.
+    document_id: Optional. Stable logical document identifier. If provided, edits the latest version by default.
+    from_version: Optional. When using document_id, specify which version to edit (defaults to latest).
     edit_instructions: Detailed instructions for what changes to make (e.g., "Update the address", "Change timeline to 6 months")
 """

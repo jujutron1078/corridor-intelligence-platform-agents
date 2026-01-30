@@ -64,12 +64,16 @@ def build_context_from_state(state: dict[str, Any]) -> dict[str, str]:
     artifacts_summary_parts = []
     for artifact in artifacts:
         artifact_id = artifact.get("id", "N/A")
+        document_id = artifact.get("document_id", "N/A")
+        parent_id = artifact.get("parent_id", "N/A")
         document_name = artifact.get("document_name", "N/A")
         timestamp = artifact.get("timestamp", "N/A")
         version = artifact.get("version", "N/A")
 
         artifact_info = []
         artifact_info.append(f"**ID**: {artifact_id}")
+        artifact_info.append(f"**Document ID**: {document_id}")
+        artifact_info.append(f"**Parent ID**: {parent_id}")
         artifact_info.append(f"**Title**: {document_name}")
         artifact_info.append(f"**Timestamp**: {timestamp}")
         artifact_info.append(f"**Version**: {version}")
