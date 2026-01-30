@@ -10,6 +10,7 @@ from .description import THINK_TOOL_DESCRIPTION
 from .utils import extract_uploaded_files_from_message, replace_file_blocks_with_document_summary
 
 
+
 @tool(description=THINK_TOOL_DESCRIPTION)
 def think_tool(
     reflection: str,

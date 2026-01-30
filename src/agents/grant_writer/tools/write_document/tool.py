@@ -6,10 +6,10 @@ from langgraph.types import Command
 from langchain.chat_models import init_chat_model
 
 from src.shared.utils.doc_ids import make_artifact_id
+from src.shared.utils.progress import ProgressTracker
 from .schema import WriteDocumentInput
 from .description import TOOL_DESCRIPTION
 from .prompt import AGENT_PROMPT
-from .progress import ProgressTracker
 from .messages import PROGRESS_SUB_MESSAGES
 from .utils import get_documents_index, resolve_doc, load_template, get_company_context, get_document_content_as_text
 
@@ -156,7 +156,12 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         doc_id = make_artifact_id(payload.document_name or "document")
     else:
         doc_id = make_artifact_id("document")
-    progress = ProgressTracker(runtime.stream_writer, doc_id, payload.document_name)
+    progress = ProgressTracker(
+        runtime.stream_writer,
+        event_type="write_document_progress",
+        id=doc_id,
+        name=payload.document_name,
+    )
 
     # Get the document id and check if it exists in the state
     progress.update("Starting document generation process...")
@@ -285,9 +290,10 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         # get the tone
         tone = payload.tone
 
-        # Get company context (loaded at module init from all company_info files)
+        # Get company context from shared utility (organization from runtime context)
         progress.update("Loading company context...")
-        company_context = get_company_context()
+        org_name = getattr(runtime.context, "organization_name", "") or ""
+        company_context = get_company_context(org_name)
 
         # Build system message
         progress.update("Building system prompt with all context and instructions...")
@@ -472,9 +478,10 @@ def write_document(payload: WriteDocumentInput, runtime: ToolRuntime) -> Command
         audience = payload.audience
         tone = payload.tone
 
-        # Get company context
+        # Get company context from shared utility (organization from runtime context)
         progress.update("Loading company context for template filling...")
-        company_context = get_company_context()
+        org_name = getattr(runtime.context, "organization_name", "") or ""
+        company_context = get_company_context(org_name)
 
         # Build system message
         progress.update("Building system prompt with template and context...")
