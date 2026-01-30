@@ -34,5 +34,4 @@ Use this tool when you want to generate a full final document in ONE call.
 - `reference_document_ids`: Documents to use as evidence/source material
 - `constraints`, `must_include`, `must_not_include`: Content rules
 - `audience`, `tone`: Style guidance
-- `next_document_to_generate`: For chaining multiple documents
 """

@@ -6,6 +6,6 @@ class DeleteFileInput(BaseModel):
     The input schema for the delete_file tool.
     """
 
-    artifact_ids: list[str] = Field(
-        description="The IDs of the artifacts (documents) to delete. Can be a single ID or multiple IDs."
+    artifact_id: str = Field(
+        description="The ID of the artifact (document) to delete. One artifact per call."
     )

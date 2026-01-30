@@ -13,14 +13,14 @@ Read all artifacts to answer a user's question or determine if editing is needed
 3. Returns a structured response with:
    - The action needed: "provide_response" (just answer) or "edit" (identify artifacts to edit)
    - A response answering the question or explaining what will be edited
-   - If editing is needed: artifact IDs are added to the `artifacts_to_edit` state field
+   - If editing is needed: artifact IDs are added to the `artifact_edits` state field (as an entry with only `artifact_id`)
 
 **Response actions:**
 - "provide_response": User asked a question about artifacts - just provide an answer
 - "edit": User wants to edit/modify documents - identifies which artifact(s) need editing (returns list of artifact IDs)
 
 **After using this tool:**
-- If artifacts are identified for editing, check the `artifacts_to_edit` state field
+- If artifacts are identified for editing, check the `artifact_edits` state field for entries missing `edits`
 - Use `write_document` to regenerate those artifacts with the requested changes
 - Include the original artifact content and the specific changes requested in the `write_document` call
 

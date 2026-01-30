@@ -97,15 +97,12 @@ def edit_file(payload: EditFileInput, runtime: ToolRuntime) -> Command:
             }
         )
 
-    # Get existing edits and append new ones
-    existing_edits = runtime.state.get("edits", [])
-    updated_edits = existing_edits + new_edits
-
     return Command(
         update={
             "messages": [
                 ToolMessage(content=f"Created {len(new_edits)} edit(s) successfully", tool_call_id=tool_call_id),
             ],
-            "edits": updated_edits,
+            # Emit only the delta for this artifact; state reducer merges across tool calls.
+            "artifact_edits": [{"artifact_id": artifact_id, "edits": new_edits}],
         }
     )

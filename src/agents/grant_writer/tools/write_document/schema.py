@@ -83,6 +83,3 @@ class WriteDocumentInput(BaseModel):
         default=None,
         description="Voice/tone guidance (formal, donor-facing, concise, etc.).",
     )
-    next_document_to_generate: Optional[str] = Field(
-        default=None, description="The next document to generate after this one."
-    )

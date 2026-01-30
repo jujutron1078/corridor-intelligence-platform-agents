@@ -2,6 +2,7 @@
 
 **Date:** [Insert Date]
 
+
 **To:**  
 [Recipient Name/Title]  
 [Project Name]  
