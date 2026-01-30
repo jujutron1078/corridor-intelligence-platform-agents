@@ -18,6 +18,31 @@ class WriteDocumentInput(BaseModel):
         description="The name we are going to give this document'"
     )
 
+    regenerate_document_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional. Use to regenerate a new version of an existing generated document. "
+            "This is the stable logical document identifier shared across versions. "
+            "If provided, write_document will create a NEW artifact with version incremented (v2, v3, ...)."
+        ),
+    )
+
+    regenerate_from_version: Optional[int] = Field(
+        default=None,
+        description=(
+            "Optional. When regenerating (regenerate_document_id provided), choose which existing version "
+            "to regenerate from. If omitted, the latest version is used."
+        ),
+    )
+
+    regenerate_from_artifact_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional. Regenerate based on a specific artifact id (a specific version). "
+            "If provided, it takes precedence over regenerate_document_id/regenerate_from_version."
+        ),
+    )
+
     generation_mode: GenerationMode = Field(
         default="open_generation",
         description="Use 'fill_template' when a strict template must be followed.",
@@ -44,6 +69,15 @@ class WriteDocumentInput(BaseModel):
                 f"Invalid document_type '{v}'. "
                 f"Available types: {', '.join(available) if available else 'none (no templates found)'}"
             )
+        return v
+
+    @field_validator("regenerate_from_version")
+    @classmethod
+    def validate_regenerate_from_version(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
+        if v < 1:
+            raise ValueError("regenerate_from_version must be >= 1")
         return v
 
     template_document_id: Optional[str] = Field(
