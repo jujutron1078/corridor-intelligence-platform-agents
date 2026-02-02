@@ -1,6 +1,12 @@
 {
   "graphs": {
-    "grant_writer": "src/agents/grant_writer/agent.py:agent"
+    "geospatial_intelligence_agent": "src/agents/geospatial_intelligence_agent/agent.py:agent",
+    "opportunity_identification_agent": "src/agents/opportunity_identification_agent/agent.py:agent",
+    "infrastructure_optimization_agent": "src/agents/infrastructure_optimization_agent/agent.py:agent",
+    "economic_impact_modeling_agent": "src/agents/economic_impact_modeling_agent/agent.py:agent",
+    "financing_optimization_agent": "src/agents/financing_optimization_agent/agent.py:agent",
+    "stakeholder_intelligence_agent": "src/agents/stakeholder_intelligence_agent/agent.py:agent",
+    "realtime_monitoring_agent": "src/agents/realtime_monitoring_agent/agent.py:agent"
   },
   "dependencies": [
     "."

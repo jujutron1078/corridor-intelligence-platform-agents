@@ -10,7 +10,7 @@ ADD . /deps/agents
 RUN for dep in /deps/*; do             echo "Installing $dep";             if [ -d "$dep" ]; then                 echo "Installing $dep";                 (cd "$dep" && PYTHONDONTWRITEBYTECODE=1 uv pip install --system --no-cache-dir -c /api/constraints.txt -e .);             fi;         done
 # -- End of local dependencies install --
 ENV LANGGRAPH_HTTP='{"app": "/deps/agents/src/api/main.py:app"}'
-ENV LANGSERVE_GRAPHS='{"grant_writer": "/deps/agents/src/agents/grant_writer/agent.py:agent"}'
+ENV LANGSERVE_GRAPHS='{"geospatial_intelligence_agent": "/deps/agents/src/agents/geospatial_intelligence_agent/agent.py:agent", "opportunity_identification_agent": "/deps/agents/src/agents/opportunity_identification_agent/agent.py:agent", "infrastructure_optimization_agent": "/deps/agents/src/agents/infrastructure_optimization_agent/agent.py:agent", "economic_impact_modeling_agent": "/deps/agents/src/agents/economic_impact_modeling_agent/agent.py:agent", "financing_optimization_agent": "/deps/agents/src/agents/financing_optimization_agent/agent.py:agent", "stakeholder_intelligence_agent": "/deps/agents/src/agents/stakeholder_intelligence_agent/agent.py:agent", "realtime_monitoring_agent": "/deps/agents/src/agents/realtime_monitoring_agent/agent.py:agent"}'
 
 
 
