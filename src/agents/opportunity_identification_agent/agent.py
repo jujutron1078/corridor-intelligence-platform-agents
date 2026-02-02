@@ -1,0 +1,23 @@
+from langchain.agents import create_agent
+
+from src.shared.llm.llm_selector import default_llm, dynamic_model_selector
+from src.agents.opportunity_identification_agent.context.context import Context
+from src.agents.opportunity_identification_agent.middleware.inject_context import inject_context
+from src.agents.opportunity_identification_agent.prompts.prompt import agent_prompt
+from src.agents.opportunity_identification_agent.state.state import OpportunityIdentificationAgentState
+from src.shared.tools import think_tool, write_todos
+
+agent = create_agent(
+    model=default_llm,
+    tools=[
+        think_tool,
+        write_todos,
+    ],
+    context_schema=Context,
+    state_schema=OpportunityIdentificationAgentState,
+    middleware=[
+        inject_context,
+        agent_prompt,
+        dynamic_model_selector
+    ],
+)
