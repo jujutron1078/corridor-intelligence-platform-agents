@@ -7,6 +7,8 @@ from functools import lru_cache
 from langchain.tools import ToolRuntime
 from pypdf import PdfReader
 
+from src.shared.utils.company_info import load_company_info_text
+
 # Template directory path
 TEMPLATES_DIR = Path(__file__).parent.parent.parent.parent.parent / "shared" / "templates" / "grant_writer"
 
@@ -180,48 +182,18 @@ def doc_brief(doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# Company info directory path
-COMPANY_INFO_DIR = Path(__file__).parent.parent.parent / "company_info"
-
-# Cache for all company info loaded at module time
-_CACHED_COMPANY_CONTEXT: Optional[str] = None
-
-
-def _load_all_company_info() -> str:
+def get_company_context(org_name: str) -> str:
     """
-    Load all company info files from the company_info directory at module load time.
-    Combines all .md files into a single string.
+    Get company context for the given organization using the shared company info utility.
+    
+    Args:
+        org_name: Organization name (e.g. "bayes") used to load src/shared/company_information/{org_name}.md.
     
     Returns:
-        Combined company info content from all files.
+        Company info text, or "No company information available." if none is found.
     """
-    if not COMPANY_INFO_DIR.exists():
-        return "No company information available."
-    
-    all_content: list[str] = []
-    
-    for info_file in sorted(COMPANY_INFO_DIR.glob("*.md")):
-        content = info_file.read_text(encoding="utf-8")
-        all_content.append(content)
-    
-    if not all_content:
-        return "No company information available."
-    
-    return "\n\n---\n\n".join(all_content)
-
-
-# Load all company context at module load time
-_CACHED_COMPANY_CONTEXT = _load_all_company_info()
-
-
-def get_company_context() -> str:
-    """
-    Get the cached company context (all company info files combined).
-    
-    Returns:
-        Combined company context string.
-    """
-    return _CACHED_COMPANY_CONTEXT or "No company information available."
+    text = load_company_info_text(org_name or "")
+    return text.strip() or "No company information available."
 
 
 def extract_base64_content(file_data: str) -> tuple[bytes, str]:

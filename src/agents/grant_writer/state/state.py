@@ -5,6 +5,13 @@ import operator
 from src.shared.schema.document_schema import Document
 
 
+class Todo(TypedDict):
+    """A single todo item with content and status."""
+
+    content: str
+    status: Literal["pending", "in_progress", "completed"]
+
+
 class Artifact(TypedDict):
     """Generated document artifact with metadata."""
     id: str
@@ -119,8 +126,20 @@ def replace_artifacts_list(left: list[Artifact], right: list[Artifact]) -> list[
     return right if isinstance(right, list) else (left or [])
 
 
+def replace_todos_list(left: list[Todo], right: list[Todo]) -> list[Todo]:
+    """
+    Custom reducer for todos list.
+
+    - If right is provided and is a list, it replaces left
+    """
+    if right is None:
+        return left or []
+    return right if isinstance(right, list) else (left or [])
+
+
 class GrantWriterState(AgentState):
     """State for the grant writer agent."""
     documents: Annotated[list[Document], operator.add]
     artifacts: Annotated[list[Artifact], replace_artifacts_list]
     artifact_edits: Annotated[list[ArtifactEdits], merge_artifact_edits]
+    todos: Annotated[NotRequired[list[Todo]], replace_todos_list]
