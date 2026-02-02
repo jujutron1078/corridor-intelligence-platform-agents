@@ -1,141 +1,150 @@
-# Grant Writer Agent
+# Corridor Intelligence Platform
 
-A sophisticated AI-powered agent built with LangGraph and LangChain that assists organizations in writing high-quality grant proposals, tender documents, and donor-facing submissions. The agent automates the entire proposal writing workflow from document analysis to final submission-ready documents.
+A platform of AI agents built with LangGraph and LangChain for corridor planning: geospatial analysis, opportunity identification, infrastructure optimization, economic impact modeling, financing, stakeholder intelligence, and real-time monitoring. The agents work along a **critical path** from foundation (geospatial, opportunity) through optimization (infrastructure, economic, financing) to support (stakeholder, monitoring).
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Features](#features)
+- [Agents](#agents)
+- [Critical Path](#critical-path)
 - [Environment Setup](#environment-setup)
-- [Running the Agent](#running-the-agent)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Tools & Capabilities](#tools--capabilities)
-- [Workflow](#workflow)
-- [API Endpoints](#api-endpoints)
+- [Running the Platform](#running-the-platform)
 - [Project Structure](#project-structure)
 - [Development](#development)
 
 ## Overview
 
-The Grant Writer Agent is designed to help organizations create submission-ready grant proposals and tender documents that are:
-- **Rooted in logic and feasible** - Based on thorough analysis and research
-- **Aligned with international donor standards** - Compliant with donor requirements
-- **Based on intensive research** - Leverages uploaded documents and company information
-- **Fully detailed** - Complete explanations, never just bullet points
+The Corridor Intelligence Platform provides seven specialized agents that support end-to-end corridor planning (e.g. Abidjan–Lagos scale):
 
-The agent supports multiple organizations (Bayes, Verst Carbon, Ignis Innovation, AFCEN) and can dynamically select LLM models based on user preferences.
+- **Tier 1 (Foundation):** Geospatial Intelligence, Opportunity Identification — provide the data all other agents depend on.
+- **Tier 2 (Optimization):** Infrastructure Optimization, Economic Impact Modeling, Financing Optimization — can be developed in parallel once Tier 1 is in place.
+- **Tier 3 (Support):** Stakeholder Intelligence, Real-time Monitoring — support implementation and engagement.
 
-## Features
 
-### Core Capabilities
 
-- **Document Analysis**: Automatically analyzes uploaded documents (ToRs, RFPs, templates, compliance guidelines) and extracts key requirements, deadlines, and compliance rules
-- **Document Generation**: Generates complete, submission-ready documents using two modes:
-  - **Open Generation**: Creates documents from scratch using internal templates and reference documents
-  - **Fill Template**: Fills uploaded forms and templates with required information
-- **Document Querying**: Answers questions about generated documents and identifies what needs editing
-- **Document Editing**: Creates targeted edits with approval workflow - edits are reviewed before applying (grouped per artifact)
-- **Document Management**: Delete generated documents and manage artifacts
-- **Company Information**: Retrieves organization details, team CVs, past projects, and credentials
-- **Task Management**: Creates and manages task lists with automatic progression through pending tasks
-- **Intelligent Planning**: Uses reflection and analysis tools to plan methodology and approach
+## Agents
+
+| # | Agent | Purpose | Key Deliverables |
+|---|--------|---------|------------------|
+| **1** | **Geospatial Intelligence** | Analyze satellite imagery and geospatial data for infrastructure, routes, co-location, and constraints. | Infrastructure detections; 50–100 route variants with geospatial scoring; co-location analysis (15–25% CAPEX savings); terrain and environmental constraints. |
+| **2** | **Opportunity Identification** | Scan corridor zones for economic opportunities and anchor loads. | Catalog of 45–57 anchor loads; demand profiles (current & projected MW); bankability scores; growth trajectories. |
+| **3** | **Infrastructure Optimization** | Optimal transmission routes, voltage, phasing, and technical specs. | Top 5–10 routes; voltage (330–400 kV), capacity, phasing; co-location savings ($120–180M); CAPEX/OPEX estimates. |
+| **4** | **Economic Impact Modeling** | Quantify GDP, jobs, poverty reduction, and sector catalytic effects. | GDP multiplier ($1.80–$2.20 per $1); job creation (200k–300k); poverty metrics; scenario comparison. |
+| **5** | **Financing Optimization** | Model blended finance and DFI matching for target returns. | 20–30 financing scenarios; grants, concessional debt, commercial debt, equity; IRR/DSCR/NPV; DFI engagement plan. |
+| **6** | **Stakeholder Intelligence** | Map stakeholders, influence networks, and engagement strategies. | 150–200 stakeholders; influence map; 4-phase engagement roadmap (24 months); risk register; sentiment monitoring. |
+| **7** | **Real-time Monitoring** | Track implementation, performance, and early warnings. | Progress dashboard; budget vs. actual; anchor load realization; alerts; adaptive recommendations. |
+
+Details on dependencies, outputs used by other agents, and milestones are in [PLAN.MD](./PLAN.MD).
+
+## Critical Path
+
+From [PLAN.MD](./PLAN.MD):
+
+1. **Geospatial** → Foundation for everything.
+2. **Opportunity** → Revenue and anchor loads.
+3. **Infrastructure** → Technical design and costs.
+4. **Economic** → Development impact.
+5. **Financing** → Investment structure.
+6. **Stakeholder** → Engagement strategy.
+7. **Monitoring** → Implementation tracking.
+
+**Dependency order:** #1 → #2 → (#3 + #4 + #5 in parallel) → (#6 + #7 in parallel).
+
+**Milestones:**
+
+- **Milestone 1:** Geospatial agent at 80% accuracy → enables Opportunity agent.
+- **Milestone 2:** Opportunity agent delivers anchor load catalog → enables Infrastructure, Economic, Financing agents.
+- **Milestone 3:** Core analytics complete → Abidjan–Lagos pilot feasibility; first DFI presentations; start Stakeholder and Monitoring.
+- **Milestone 4:** Full platform operational → production-ready; scale to 5+ corridors.
 
 ## Environment Setup
 
-### Required API Keys
+### 1. Copy environment file
 
-The agent requires several API keys to function properly. Set up your environment variables by following these steps:
+```bash
+cp .env.example .env
+```
 
-1. **Copy the example environment file**:
-   ```bash
-   cp .env.example .env
-   ```
+### 2. Configure `.env`
 
-2. **Edit the `.env` file** and add your API keys:
+Edit `.env` and set at least:
 
-   ```env
-   OPENAI_API_KEY="your_openai_api_key_here"
-   GEMINI_API_KEY="your_gemini_api_key_here"
-   TAVILY_API_KEY="your_tavily_api_key_here"
-   LANGSMITH_ENDPOINT="https://api.smith.langchain.com"
-   LANGSMITH_API_KEY="your_langsmith_api_key_here"
-   LANGSMITH_TRACING=true
-   LANGSMITH_PROJECT="bayes_agents"
-   ```
+```env
+OPENAI_API_KEY="your_openai_api_key_here"
+# Optional:
+GEMINI_API_KEY="your_gemini_api_key_here"
+TAVILY_API_KEY="your_tavily_api_key_here"
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY="your_langsmith_api_key_here"
+LANGSMITH_PROJECT="corridor_intelligence"
+```
 
-### Required APIs
+- **OpenAI** (required for default LLM): https://platform.openai.com/api-keys  
+- **Gemini** (optional): https://makersuite.google.com/app/apikey  
+- **Tavily** (optional, search): https://tavily.com/  
+- **LangSmith** (optional, tracing): https://smith.langchain.com/
 
-The following APIs are required for the agent to function:
+Do not commit `.env` or share API keys.
 
-#### 1. **OpenAI API** (Required)
-- **Purpose**: Primary LLM provider for document generation and agent reasoning
-- **Get your key**: https://platform.openai.com/api-keys
-- **Usage**: Used for all LLM operations including document writing, analysis, and tool calling
+### 3. Install dependencies
 
-#### 2. **Google Gemini API** (Optional but Recommended)
-- **Purpose**: Alternative LLM provider option
-- **Get your key**: https://makersuite.google.com/app/apikey
-- **Usage**: Can be selected as an alternative LLM model
+From the project root, install the project and its dependencies.
 
-#### 3. **Tavily API** (Optional)
-- **Purpose**: Web search and research capabilities
-- **Get your key**: https://tavily.com/
-- **Usage**: Used for conducting research and gathering context for proposals
+**Option A — using [uv](https://docs.astral.sh/uv/) (recommended):**
 
-#### 4. **LangSmith API** (Optional but Recommended)
-- **Purpose**: Tracing, debugging, and monitoring agent behavior
-- **Get your key**: https://smith.langchain.com/
-- **Usage**: 
-  - `LANGSMITH_ENDPOINT`: LangSmith API endpoint (default: https://api.smith.langchain.com)
-  - `LANGSMITH_API_KEY`: Your LangSmith API key
-  - `LANGSMITH_TRACING`: Enable/disable tracing (set to `true` for development)
-  - `LANGSMITH_PROJECT`: Project name for organizing traces (default: "bayes_agents")
+```bash
+uv sync
+```
 
-### Getting API Keys
+This creates a virtual environment (if needed) and installs dependencies from `pyproject.toml` and `uv.lock`.
 
-1. **OpenAI**: Sign up at https://platform.openai.com/ and navigate to API Keys section
-2. **Google Gemini**: Visit https://makersuite.google.com/ and create an API key
-3. **Tavily**: Sign up at https://tavily.com/ and get your API key from the dashboard
-4. **LangSmith**: Sign up at https://smith.langchain.com/ and create an API key from settings
+**Option B — using pip:**
 
-### Notes
+```bash
+python -m venv .venv
+source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+pip install -e .
+```
 
-- The `.env` file is already in `.gitignore` and will not be committed to the repository
-- Never share your API keys or commit them to version control
-- For production deployments, use secure environment variable management (e.g., AWS Secrets Manager, Azure Key Vault)
-- LangSmith tracing is recommended for development but can be disabled in production to reduce overhead
+This installs the project in editable mode with all dependencies from `pyproject.toml`.
 
-## Running the Agent
+Ensure you are using **Python 3.13** (see `.python-version` or `pyproject.toml`).
 
-### Local Development (Python 3.13)
+## Running the Platform
 
-Run the agent locally using LangGraph dev server:
+### Local development (Python 3.13)
+
+From the project root:
 
 ```bash
 langgraph dev
 ```
 
-Once the server is running, you can access:
+Then:
 
-- 🚀 **API**: http://127.0.0.1:2024
-- 🎨 **Studio UI**: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
-- 📚 **API Docs**: http://127.0.0.1:2024/docs
+- **API:** http://127.0.0.1:2024  
+- **Studio UI:** https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024  
+- **API Docs:** http://127.0.0.1:2024/docs  
 
-### Docker Deployment
 
-Run the agent using Docker Compose:
+
+### Docker
 
 ```bash
 docker compose up
 ```
 
-When using Docker, the base URL changes to:
+- **Base URL:** http://localhost:8000  
+- **API Docs:** http://localhost:8000/docs  
 
-- **Base URL**: http://localhost:8000
-- 🚀 **API**: http://localhost:8000
-- 🎨 **Studio UI**: https://smith.langchain.com/studio/?baseUrl=http://localhost:8000
-- 📚 **API Docs**: http://localhost:8000/docs
+All seven agents are registered in `langgraph.json` and in the Dockerfile `LANGSERVE_GRAPHS` env.
 
+
+
+
+## Development
+
+- **Dependencies:** See [Environment Setup → Install dependencies](#3-install-dependencies) above.
+- **Lint / format:** Use your preferred Python linter and formatter.  
+- **Adding an agent:** Add a new folder under `src/agents/` with the same structure (context, middleware, prompts, state), register it in `langgraph.json` and in the Dockerfile `LANGSERVE_GRAPHS`.  
+- **Planning and milestones:** See [PLAN.MD](./PLAN.MD) for agent order, dependencies, and deliverables.
