@@ -16,3 +16,6 @@ wheels/
 
 # LangGraph API files
 .langgraph_api/
+
+# Task notes (by date)
+tasks/
