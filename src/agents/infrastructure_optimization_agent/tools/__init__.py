@@ -1,11 +1,3 @@
-"""
-Infrastructure Optimization Agent tools package.
-
-Each tool lives in its own submodule with:
-- description.py  (human-readable description)
-- tool.py         (LangChain tool implementation)
-"""
-
 from .infra_input_validator.tool import infra_input_validator_tool
 from .infra_cost_surface.tool import infra_cost_surface_tool
 from .infra_route_optimization.tool import infra_route_optimization_tool

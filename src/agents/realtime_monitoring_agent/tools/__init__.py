@@ -1,11 +1,3 @@
-"""
-Realtime Monitoring Agent tools package.
-
-Each tool lives in its own submodule with:
-- description.py  (human-readable description)
-- tool.py         (LangChain tool implementation)
-"""
-
 from .rt_baseline_validator.tool import rt_baseline_validator_tool
 from .rt_live_feed_ingestor.tool import rt_live_feed_ingestor_tool
 from .rt_satellite_monitoring.tool import rt_satellite_monitoring_tool
