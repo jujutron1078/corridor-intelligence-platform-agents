@@ -1,11 +1,3 @@
-"""
-Geospatial Intelligence Agent tools package.
-
-Each tool lives in its own submodule with:
-- description.py  (human-readable description)
-- tool.py         (LangChain tool implementation)
-"""
-
 from .geo_input_validation.tool import geo_input_validation_tool
 from .geo_data_catalog.tool import geo_data_catalog_tool
 from .geo_imagery_acquisition.tool import geo_imagery_acquisition_tool

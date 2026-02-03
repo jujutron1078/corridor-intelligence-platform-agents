@@ -1,11 +1,3 @@
-"""
-Opportunity Identification Agent tools package.
-
-Each tool lives in its own submodule with:
-- description.py  (human-readable description)
-- tool.py         (LangChain tool implementation)
-"""
-
 from .opp_input_validator.tool import opp_input_validator_tool
 from .opp_source_ingestion.tool import opp_source_ingestion_tool
 from .opp_entity_resolution.tool import opp_entity_resolution_tool

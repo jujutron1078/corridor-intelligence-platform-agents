@@ -1,11 +1,3 @@
-"""
-Economic Impact Modeling Agent tools package.
-
-Each tool lives in its own submodule with:
-- description.py  (human-readable description)
-- tool.py         (LangChain tool implementation)
-"""
-
 from .econ_input_validator.tool import econ_input_validator_tool
 from .econ_baseline_builder.tool import econ_baseline_builder_tool
 from .econ_multiplier_model.tool import econ_multiplier_model_tool

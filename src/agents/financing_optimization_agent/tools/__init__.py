@@ -1,11 +1,3 @@
-"""
-Financing Optimization Agent tools package.
-
-Each tool lives in its own submodule with:
-- description.py  (human-readable description)
-- tool.py         (LangChain tool implementation)
-"""
-
 from .fin_input_validator.tool import fin_input_validator_tool
 from .fin_base_model.tool import fin_base_model_tool
 from .fin_scenario_generator.tool import fin_scenario_generator_tool

@@ -1,11 +1,3 @@
-"""
-Stakeholder Intelligence Agent tools package.
-
-Each tool lives in its own submodule with:
-- description.py  (human-readable description)
-- tool.py         (LangChain tool implementation)
-"""
-
 from .stake_input_validator.tool import stake_input_validator_tool
 from .stake_harvesting.tool import stake_harvesting_tool
 from .stake_entity_resolution.tool import stake_entity_resolution_tool
