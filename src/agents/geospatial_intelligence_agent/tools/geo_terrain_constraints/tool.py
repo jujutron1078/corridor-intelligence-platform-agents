@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_terrain_constraints", description=TOOL_DESCRIPTION)
-def geo_terrain_constraints_tool(config: dict, runtime: ToolRuntime) -> Command:
+def geo_terrain_constraints_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: compute slope, crossings, and protected-area intersections.
     """
@@ -20,7 +20,7 @@ def geo_terrain_constraints_tool(config: dict, runtime: ToolRuntime) -> Command:
             "river_crossings": 7,
             "protected_area_intersections": 2,
         },
-        "echo": config,
+        
     }
     return Command(
         update={

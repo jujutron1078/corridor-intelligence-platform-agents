@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_colocation_analyzer", description=TOOL_DESCRIPTION)
-def geo_colocation_analyzer_tool(config: dict, runtime: ToolRuntime) -> Command:
+def geo_colocation_analyzer_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: compute co-location overlap vs existing ROW and savings band.
     """
@@ -17,7 +17,7 @@ def geo_colocation_analyzer_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "colocation_analyzer",
         "overlap_pct": 0.21,
         "savings_band_pct": [0.15, 0.25],
-        "echo": config,
+        
     }
     return Command(
         update={

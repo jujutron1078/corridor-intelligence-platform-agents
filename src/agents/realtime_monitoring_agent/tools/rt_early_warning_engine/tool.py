@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("rt_early_warning_engine", description=TOOL_DESCRIPTION)
-def rt_early_warning_engine_tool(config: dict, runtime: ToolRuntime) -> Command:
+def rt_early_warning_engine_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: detect overruns, delays, and ranked risks.
     """
@@ -18,7 +18,7 @@ def rt_early_warning_engine_tool(config: dict, runtime: ToolRuntime) -> Command:
         "alerts": [
             {"id": "a1", "severity": "medium", "issue": "slight schedule slippage"},
         ],
-        "echo": config,
+        
     }
     return Command(
         update={

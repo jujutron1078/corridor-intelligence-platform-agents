@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("stake_harvesting", description=TOOL_DESCRIPTION)
-def stake_harvesting_tool(config: dict, runtime: ToolRuntime) -> Command:
+def stake_harvesting_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: collect stakeholder candidates across categories.
     """
@@ -16,7 +16,7 @@ def stake_harvesting_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "stakeholder_harvesting",
         "candidate_count": 180,
-        "echo": config,
+        
     }
     return Command(
         update={

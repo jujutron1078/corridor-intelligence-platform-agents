@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("econ_baseline_builder", description=TOOL_DESCRIPTION)
-def econ_baseline_builder_tool(config: dict, runtime: ToolRuntime) -> Command:
+def econ_baseline_builder_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: assemble corridor baseline GDP, jobs, poverty, sector shares.
     """
@@ -20,7 +20,7 @@ def econ_baseline_builder_tool(config: dict, runtime: ToolRuntime) -> Command:
             "jobs": 500_000,
             "poverty_rate": 0.35,
         },
-        "echo": config,
+        
     }
     return Command(
         update={

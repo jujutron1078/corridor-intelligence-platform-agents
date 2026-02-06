@@ -1,5 +1,6 @@
 {
   "graphs": {
+    "orchestrator_agent": "src/agents/orchestrator_agent/agent.py:agent",
     "geospatial_intelligence_agent": "src/agents/geospatial_intelligence_agent/agent.py:agent",
     "opportunity_identification_agent": "src/agents/opportunity_identification_agent/agent.py:agent",
     "infrastructure_optimization_agent": "src/agents/infrastructure_optimization_agent/agent.py:agent",

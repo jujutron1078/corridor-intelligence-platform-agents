@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("rt_kpi_calculator", description=TOOL_DESCRIPTION)
-def rt_kpi_calculator_tool(config: dict, runtime: ToolRuntime) -> Command:
+def rt_kpi_calculator_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: compute earned value, schedule and budget variance, and covenant checks.
     """
@@ -20,7 +20,7 @@ def rt_kpi_calculator_tool(config: dict, runtime: ToolRuntime) -> Command:
             "cpi": 0.98,
             "burn_rate_vs_plan": 1.05,
         },
-        "echo": config,
+        
     }
     return Command(
         update={

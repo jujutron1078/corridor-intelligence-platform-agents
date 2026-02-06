@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("stake_entity_resolution", description=TOOL_DESCRIPTION)
-def stake_entity_resolution_tool(config: dict, runtime: ToolRuntime) -> Command:
+def stake_entity_resolution_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: dedupe names, roles, and org hierarchies.
     """
@@ -16,7 +16,7 @@ def stake_entity_resolution_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "entity_resolution",
         "unique_stakeholders": 170,
-        "echo": config,
+        
     }
     return Command(
         update={

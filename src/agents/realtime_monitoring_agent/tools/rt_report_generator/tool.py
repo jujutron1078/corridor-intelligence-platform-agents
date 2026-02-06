@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("rt_report_generator", description=TOOL_DESCRIPTION)
-def rt_report_generator_tool(_: dict, runtime: ToolRuntime) -> Command:
+def rt_report_generator_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: generate DFI-compliant reports and dashboard refresh.
     """

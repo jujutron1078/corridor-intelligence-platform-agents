@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("fin_optimizer", description=TOOL_DESCRIPTION)
-def fin_optimizer_tool(config: dict, runtime: ToolRuntime) -> Command:
+def fin_optimizer_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: choose capital stack meeting IRR/DSCR constraints.
     """
@@ -16,7 +16,7 @@ def fin_optimizer_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "optimizer",
         "recommended_scenario_id": "scenario_07",
-        "echo": config,
+        
     }
     return Command(
         update={

@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_preprocessing", description=TOOL_DESCRIPTION)
-def geo_preprocessing_tool(config: dict, runtime: ToolRuntime) -> Command:
+def geo_preprocessing_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: reproject, normalize, mosaic, tile imagery into inference-ready chips.
     """
@@ -17,7 +17,7 @@ def geo_preprocessing_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "preprocessing",
         "chip_count": 128,
         "crs": "EPSG:3857",
-        "echo": config,
+        
     }
     return Command(
         update={

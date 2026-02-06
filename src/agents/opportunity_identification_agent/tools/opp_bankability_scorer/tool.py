@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("opp_bankability_scorer", description=TOOL_DESCRIPTION)
-def opp_bankability_scorer_tool(config: dict, runtime: ToolRuntime) -> Command:
+def opp_bankability_scorer_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: assign bankability scores.
     """
@@ -20,7 +20,7 @@ def opp_bankability_scorer_tool(config: dict, runtime: ToolRuntime) -> Command:
             "medium": 25,
             "low": 10,
         },
-        "echo": config,
+        
     }
     return Command(
         update={

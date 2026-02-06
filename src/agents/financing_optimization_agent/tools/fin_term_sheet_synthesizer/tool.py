@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("fin_term_sheet_synthesizer", description=TOOL_DESCRIPTION)
-def fin_term_sheet_synthesizer_tool(config: dict, runtime: ToolRuntime) -> Command:
+def fin_term_sheet_synthesizer_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: generate recommended structure and rationale.
     """
@@ -16,7 +16,7 @@ def fin_term_sheet_synthesizer_tool(config: dict, runtime: ToolRuntime) -> Comma
         "status": "ok",
         "step": "term_sheet_synthesizer",
         "summary": "Mock blended finance structure summary.",
-        "echo": config,
+        
     }
     return Command(
         update={

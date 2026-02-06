@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("econ_scenario_runner", description=TOOL_DESCRIPTION)
-def econ_scenario_runner_tool(config: dict, runtime: ToolRuntime) -> Command:
+def econ_scenario_runner_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: run low/base/high scenarios with confidence intervals.
     """
@@ -20,7 +20,7 @@ def econ_scenario_runner_tool(config: dict, runtime: ToolRuntime) -> Command:
             {"name": "base", "gdp_annual_usd_b": 6.0},
             {"name": "high", "gdp_annual_usd_b": 7.5},
         ],
-        "echo": config,
+        
     }
     return Command(
         update={

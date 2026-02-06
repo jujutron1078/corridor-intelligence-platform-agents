@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("infra_colocation_quant", description=TOOL_DESCRIPTION)
-def infra_colocation_quant_tool(config: dict, runtime: ToolRuntime) -> Command:
+def infra_colocation_quant_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: compute co-location overlap and savings band.
     """
@@ -17,7 +17,7 @@ def infra_colocation_quant_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "colocation_quant",
         "overlap_pct": 0.2,
         "savings_band_pct": [0.15, 0.25],
-        "echo": config,
+        
     }
     return Command(
         update={

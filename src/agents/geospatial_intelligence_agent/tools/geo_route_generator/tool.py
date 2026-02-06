@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_route_generator", description=TOOL_DESCRIPTION)
-def geo_route_generator_tool(config: dict, runtime: ToolRuntime) -> Command:
+def geo_route_generator_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: generate 50–100 route variants with basic scoring.
     """
@@ -20,7 +20,7 @@ def geo_route_generator_tool(config: dict, runtime: ToolRuntime) -> Command:
             {"id": "route_lowest_risk", "variant": "lowest_risk", "score": 0.82},
             {"id": "route_high_colocation", "variant": "highest_colocation", "score": 0.8},
         ],
-        "echo": config,
+        
     }
     return Command(
         update={

@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("infra_phasing_optimizer", description=TOOL_DESCRIPTION)
-def infra_phasing_optimizer_tool(config: dict, runtime: ToolRuntime) -> Command:
+def infra_phasing_optimizer_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: align phases with highest-demand clusters first.
     """
@@ -19,7 +19,7 @@ def infra_phasing_optimizer_tool(config: dict, runtime: ToolRuntime) -> Command:
             {"phase": 1, "description": "High-demand clusters"},
             {"phase": 2, "description": "Secondary clusters"},
         ],
-        "echo": config,
+        
     }
     return Command(
         update={

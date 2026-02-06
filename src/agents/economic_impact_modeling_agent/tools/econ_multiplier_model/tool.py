@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("econ_multiplier_model", description=TOOL_DESCRIPTION)
-def econ_multiplier_model_tool(config: dict, runtime: ToolRuntime) -> Command:
+def econ_multiplier_model_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: apply corridor-specific multipliers.
     """
@@ -16,7 +16,7 @@ def econ_multiplier_model_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "multiplier_model",
         "multiplier_range": [1.8, 2.2],
-        "echo": config,
+        
     }
     return Command(
         update={

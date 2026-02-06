@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("infra_route_optimization", description=TOOL_DESCRIPTION)
-def infra_route_optimization_tool(config: dict, runtime: ToolRuntime) -> Command:
+def infra_route_optimization_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: evaluate and refine route candidates to top 5–10.
     """
@@ -16,7 +16,7 @@ def infra_route_optimization_tool(config: dict, runtime: ToolRuntime) -> Command
         "status": "ok",
         "step": "route_optimization",
         "recommended_route_ids": [f"route_{i}" for i in range(1, 6)],
-        "echo": config,
+        
     }
     return Command(
         update={

@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_imagery_acquisition", description=TOOL_DESCRIPTION)
-def geo_imagery_acquisition_tool(config: dict, runtime: ToolRuntime) -> Command:
+def geo_imagery_acquisition_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: fetch tiles for corridor and buffer.
     """
@@ -19,7 +19,7 @@ def geo_imagery_acquisition_tool(config: dict, runtime: ToolRuntime) -> Command:
             {"scene_id": "S2A_MOCK_001", "cloud_cover_pct": 5.0},
             {"scene_id": "S2B_MOCK_002", "cloud_cover_pct": 8.0},
         ],
-        "echo": config,
+        
     }
     return Command(
         update={

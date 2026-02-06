@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("stake_risk_register", description=TOOL_DESCRIPTION)
-def stake_risk_register_tool(config: dict, runtime: ToolRuntime) -> Command:
+def stake_risk_register_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: political/social/coordination risks and mitigations.
     """
@@ -16,7 +16,7 @@ def stake_risk_register_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "risk_register",
         "risk_count": 10,
-        "echo": config,
+        
     }
     return Command(
         update={

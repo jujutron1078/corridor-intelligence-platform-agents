@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_qa_benchmark", description=TOOL_DESCRIPTION)
-def geo_qa_benchmark_tool(config: dict, runtime: ToolRuntime) -> Command:
+def geo_qa_benchmark_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: QA against known sites; returns static precision/recall.
     """
@@ -20,7 +20,7 @@ def geo_qa_benchmark_tool(config: dict, runtime: ToolRuntime) -> Command:
             "recall": 0.8,
             "f1": 0.847,
         },
-        "echo": config,
+        
     }
     return Command(
         update={

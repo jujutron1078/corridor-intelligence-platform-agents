@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("econ_output_packager", description=TOOL_DESCRIPTION)
-def econ_output_packager_tool(_: dict, runtime: ToolRuntime) -> Command:
+def econ_output_packager_tool(runtime: ToolRuntime) -> Command:
     """
     Mock tool: package results dataset and narrative-ready summary.
     """

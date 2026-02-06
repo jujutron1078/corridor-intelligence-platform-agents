@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("stake_influence_graph", description=TOOL_DESCRIPTION)
-def stake_influence_graph_tool(config: dict, runtime: ToolRuntime) -> Command:
+def stake_influence_graph_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: build influence network and key pathways.
     """
@@ -17,7 +17,7 @@ def stake_influence_graph_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "influence_graph_builder",
         "nodes": 170,
         "edges": 320,
-        "echo": config,
+        
     }
     return Command(
         update={
