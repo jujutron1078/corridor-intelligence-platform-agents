@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("opp_growth_projection", description=TOOL_DESCRIPTION)
-def opp_growth_projection_tool(config: dict, runtime: ToolRuntime) -> Command:
+def opp_growth_projection_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: project demand to 2035 with scenarios.
     """
@@ -17,7 +17,7 @@ def opp_growth_projection_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "growth_projection",
         "projected_total_mw_range_2035": [2650, 3880],
         "scenarios": ["low", "base", "high"],
-        "echo": config,
+        
     }
     return Command(
         update={

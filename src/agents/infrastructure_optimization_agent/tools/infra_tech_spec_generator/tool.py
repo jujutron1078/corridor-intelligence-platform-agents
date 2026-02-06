@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("infra_tech_spec_generator", description=TOOL_DESCRIPTION)
-def infra_tech_spec_generator_tool(_: dict, runtime: ToolRuntime) -> Command:
+def infra_tech_spec_generator_tool(runtime: ToolRuntime) -> Command:
     """
     Mock tool: generate high-level technical specs and BOQ-lite.
     """

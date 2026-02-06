@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("rt_recommendation_engine", description=TOOL_DESCRIPTION)
-def rt_recommendation_engine_tool(config: dict, runtime: ToolRuntime) -> Command:
+def rt_recommendation_engine_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: suggest mitigations and resequencing options.
     """
@@ -16,7 +16,7 @@ def rt_recommendation_engine_tool(config: dict, runtime: ToolRuntime) -> Command
         "status": "ok",
         "step": "recommendation_engine",
         "recommendations": ["increase night shifts on critical segment"],
-        "echo": config,
+        
     }
     return Command(
         update={

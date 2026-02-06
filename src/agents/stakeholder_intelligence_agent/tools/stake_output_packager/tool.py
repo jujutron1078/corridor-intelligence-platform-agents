@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("stake_output_packager", description=TOOL_DESCRIPTION)
-def stake_output_packager_tool(_: dict, runtime: ToolRuntime) -> Command:
+def stake_output_packager_tool(runtime: ToolRuntime) -> Command:
     """
     Mock tool: database, network, and playbook manifest.
     """

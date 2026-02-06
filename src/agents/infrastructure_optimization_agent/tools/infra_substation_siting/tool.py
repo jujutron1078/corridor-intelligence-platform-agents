@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("infra_substation_siting", description=TOOL_DESCRIPTION)
-def infra_substation_siting_tool(config: dict, runtime: ToolRuntime) -> Command:
+def infra_substation_siting_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: cluster anchor loads and place substations.
     """
@@ -16,7 +16,7 @@ def infra_substation_siting_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "substation_siting",
         "substation_count": 10,
-        "echo": config,
+        
     }
     return Command(
         update={

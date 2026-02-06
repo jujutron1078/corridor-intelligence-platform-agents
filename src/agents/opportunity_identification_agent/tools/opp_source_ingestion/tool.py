@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("opp_source_ingestion", description=TOOL_DESCRIPTION)
-def opp_source_ingestion_tool(config: dict, runtime: ToolRuntime) -> Command:
+def opp_source_ingestion_tool(task: str, runtime: ToolRuntime) -> Command:
     """
     Mock tool: pull registries, plans, and structured datasets.
     """
@@ -20,7 +20,7 @@ def opp_source_ingestion_tool(config: dict, runtime: ToolRuntime) -> Command:
             "mock_sez_list",
             "mock_mining_cadastre",
         ],
-        "echo": config,
+        "echo": task,
     }
     return Command(
         update={

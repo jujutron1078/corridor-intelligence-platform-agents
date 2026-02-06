@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("opp_entity_resolution", description=TOOL_DESCRIPTION)
-def opp_entity_resolution_tool(config: dict, runtime: ToolRuntime) -> Command:
+def opp_entity_resolution_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: match facilities/companies to geo detections; dedupe.
     """
@@ -17,7 +17,7 @@ def opp_entity_resolution_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "entity_resolution",
         "resolved_entities": 50,
         "duplicates_removed": 5,
-        "echo": config,
+        
     }
     return Command(
         update={

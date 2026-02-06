@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("fin_base_model", description=TOOL_DESCRIPTION)
-def fin_base_model_tool(config: dict, runtime: ToolRuntime) -> Command:
+def fin_base_model_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: build base project cashflows.
     """
@@ -16,7 +16,7 @@ def fin_base_model_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "base_financial_model",
         "model_id": "mock_base_model_v1",
-        "echo": config,
+        
     }
     return Command(
         update={

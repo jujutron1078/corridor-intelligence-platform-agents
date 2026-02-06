@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_output_packager", description=TOOL_DESCRIPTION)
-def geo_output_packager_tool(_: dict, runtime: ToolRuntime) -> Command:
+def geo_output_packager_tool(runtime: ToolRuntime) -> Command:
     """
     Mock tool: produce final GeoJSON/raster artifact manifest.
     """

@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("stake_engagement_planner", description=TOOL_DESCRIPTION)
-def stake_engagement_planner_tool(config: dict, runtime: ToolRuntime) -> Command:
+def stake_engagement_planner_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: design phase plan and messaging per segment.
     """
@@ -16,7 +16,7 @@ def stake_engagement_planner_tool(config: dict, runtime: ToolRuntime) -> Command
         "status": "ok",
         "step": "engagement_planner",
         "phases": ["discovery", "alignment", "commitments", "execution"],
-        "echo": config,
+        
     }
     return Command(
         update={

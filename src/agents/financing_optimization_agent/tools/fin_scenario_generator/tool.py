@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("fin_scenario_generator", description=TOOL_DESCRIPTION)
-def fin_scenario_generator_tool(config: dict, runtime: ToolRuntime) -> Command:
+def fin_scenario_generator_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: produce 20–30 blended finance structures.
     """
@@ -16,7 +16,7 @@ def fin_scenario_generator_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "scenario_generator",
         "scenario_count": 25,
-        "echo": config,
+        
     }
     return Command(
         update={

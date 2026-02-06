@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("infra_output_packager", description=TOOL_DESCRIPTION)
-def infra_output_packager_tool(_: dict, runtime: ToolRuntime) -> Command:
+def infra_output_packager_tool(runtime: ToolRuntime) -> Command:
     """
     Mock tool: route book, segment table, and CAPEX/OPEX dataset manifest.
     """

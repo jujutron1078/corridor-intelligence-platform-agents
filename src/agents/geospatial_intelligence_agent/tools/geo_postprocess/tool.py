@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("geo_postprocess", description=TOOL_DESCRIPTION)
-def geo_postprocess_tool(config: dict, runtime: ToolRuntime) -> Command:
+def geo_postprocess_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: deduplicate, vectorize footprints, assign confidence, snap to networks.
     """
@@ -16,7 +16,7 @@ def geo_postprocess_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "postprocess",
         "vector_detections_count": 3,
-        "echo": config,
+        
     }
     return Command(
         update={

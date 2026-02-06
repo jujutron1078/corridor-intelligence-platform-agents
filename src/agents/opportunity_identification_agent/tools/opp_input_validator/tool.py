@@ -12,6 +12,8 @@ def opp_input_validator_tool(payload: dict, runtime: ToolRuntime) -> Command:
     """
     Mock tool: ensure Geo detections exist (or accept partial).
     """
+
+    # TODO: Implement the tool logic
     result = {
         "status": "ok",
         "step": "input_validator",

@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("econ_jobs_poverty_module", description=TOOL_DESCRIPTION)
-def econ_jobs_poverty_module_tool(config: dict, runtime: ToolRuntime) -> Command:
+def econ_jobs_poverty_module_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: estimate direct/indirect/induced jobs and poverty metrics.
     """
@@ -17,7 +17,7 @@ def econ_jobs_poverty_module_tool(config: dict, runtime: ToolRuntime) -> Command
         "step": "jobs_poverty_module",
         "jobs_range": [200_000, 300_000],
         "poverty_metrics": {"people_lifted_out": [50_000, 100_000]},
-        "echo": config,
+        
     }
     return Command(
         update={

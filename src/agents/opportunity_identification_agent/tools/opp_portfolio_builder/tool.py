@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("opp_portfolio_builder", description=TOOL_DESCRIPTION)
-def opp_portfolio_builder_tool(_: dict, runtime: ToolRuntime) -> Command:
+def opp_portfolio_builder_tool(runtime: ToolRuntime) -> Command:
     """
     Mock tool: produce final catalog of 45–57 anchor loads.
     """

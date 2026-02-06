@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("fin_monte_carlo_risk", description=TOOL_DESCRIPTION)
-def fin_monte_carlo_risk_tool(config: dict, runtime: ToolRuntime) -> Command:
+def fin_monte_carlo_risk_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: stress test and sensitivity outputs.
     """
@@ -17,7 +17,7 @@ def fin_monte_carlo_risk_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "monte_carlo_risk",
         "prob_meet_dscr": 0.85,
         "prob_meet_equity_irr": 0.78,
-        "echo": config,
+        
     }
     return Command(
         update={

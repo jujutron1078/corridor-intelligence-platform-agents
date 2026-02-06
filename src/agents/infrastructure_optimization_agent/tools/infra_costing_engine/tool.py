@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("infra_costing_engine", description=TOOL_DESCRIPTION)
-def infra_costing_engine_tool(config: dict, runtime: ToolRuntime) -> Command:
+def infra_costing_engine_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: compute CAPEX/OPEX ranges and contingencies.
     """
@@ -17,7 +17,7 @@ def infra_costing_engine_tool(config: dict, runtime: ToolRuntime) -> Command:
         "step": "costing_engine",
         "capex_range_usd_m": [730, 1005],
         "opex_range_usd_m_per_year": [15, 25],
-        "echo": config,
+        
     }
     return Command(
         update={

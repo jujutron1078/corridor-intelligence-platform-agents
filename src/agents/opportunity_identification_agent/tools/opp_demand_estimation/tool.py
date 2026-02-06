@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("opp_demand_estimation", description=TOOL_DESCRIPTION)
-def opp_demand_estimation_tool(config: dict, runtime: ToolRuntime) -> Command:
+def opp_demand_estimation_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: estimate current MW and load factors.
     """
@@ -16,7 +16,7 @@ def opp_demand_estimation_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "demand_estimation",
         "current_total_mw_range": [950, 1300],
-        "echo": config,
+        
     }
     return Command(
         update={

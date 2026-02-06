@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("opp_output_packager", description=TOOL_DESCRIPTION)
-def opp_output_packager_tool(_: dict, runtime: ToolRuntime) -> Command:
+def opp_output_packager_tool(runtime: ToolRuntime) -> Command:
     """
     Mock tool: write structured catalog and summary stats.
     """

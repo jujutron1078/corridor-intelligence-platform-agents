@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("rt_satellite_monitoring", description=TOOL_DESCRIPTION)
-def rt_satellite_monitoring_tool(config: dict, runtime: ToolRuntime) -> Command:
+def rt_satellite_monitoring_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: detect construction progress and anomalies from satellite.
     """
@@ -16,7 +16,7 @@ def rt_satellite_monitoring_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "satellite_monitoring",
         "construction_activity_detected": True,
-        "echo": config,
+        
     }
     return Command(
         update={

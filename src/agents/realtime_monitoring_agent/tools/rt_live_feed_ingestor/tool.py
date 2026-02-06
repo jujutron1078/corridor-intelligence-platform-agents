@@ -8,7 +8,7 @@ from .description import TOOL_DESCRIPTION
 
 
 @tool("rt_live_feed_ingestor", description=TOOL_DESCRIPTION)
-def rt_live_feed_ingestor_tool(config: dict, runtime: ToolRuntime) -> Command:
+def rt_live_feed_ingestor_tool( runtime: ToolRuntime) -> Command:
     """
     Mock tool: pull progress, cost, and timeline updates.
     """
@@ -16,7 +16,7 @@ def rt_live_feed_ingestor_tool(config: dict, runtime: ToolRuntime) -> Command:
         "status": "ok",
         "step": "live_feed_ingestor",
         "feeds": ["schedule", "costs", "throughput"],
-        "echo": config,
+        
     }
     return Command(
         update={
