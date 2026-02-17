@@ -6,13 +6,12 @@ from src.agents.realtime_monitoring_agent.middleware.inject_context import injec
 from src.agents.realtime_monitoring_agent.prompts.prompt import agent_prompt
 from src.agents.realtime_monitoring_agent.state.state import RealtimeMonitoringAgentState
 from src.agents.realtime_monitoring_agent.tools import (
-    rt_baseline_validator_tool,
-    rt_live_feed_ingestor_tool,
-    rt_satellite_monitoring_tool,
-    rt_kpi_calculator_tool,
-    rt_early_warning_engine_tool,
-    rt_recommendation_engine_tool,
-    rt_report_generator_tool,
+    track_construction_progress_tool,
+    monitor_financial_performance_tool,
+    audit_anchor_load_realization_tool,
+    track_economic_impact_kpis_tool,
+    detect_implementation_risks_tool,
+    generate_adaptive_recommendations_tool,
 )
 from src.shared.tools import think_tool, write_todos
 
@@ -21,13 +20,12 @@ agent = create_agent(
     tools=[
         think_tool,
         write_todos,
-        rt_baseline_validator_tool,
-        rt_live_feed_ingestor_tool,
-        rt_satellite_monitoring_tool,
-        rt_kpi_calculator_tool,
-        rt_early_warning_engine_tool,
-        rt_recommendation_engine_tool,
-        rt_report_generator_tool,
+        track_construction_progress_tool,
+        monitor_financial_performance_tool,
+        audit_anchor_load_realization_tool,
+        track_economic_impact_kpis_tool,
+        detect_implementation_risks_tool,
+        generate_adaptive_recommendations_tool,
     ],
     context_schema=Context,
     state_schema=RealtimeMonitoringAgentState,
