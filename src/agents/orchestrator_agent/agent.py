@@ -14,7 +14,6 @@ from src.agents.orchestrator_agent.sub_agent import (
     economic_impact_modeling_agent,
     financing_optimization_agent,
     stakeholder_intelligence_agent,
-    realtime_monitoring_agent,
 )
 
 
@@ -31,7 +30,6 @@ agent = create_agent(
         economic_impact_modeling_agent,
         financing_optimization_agent,
         stakeholder_intelligence_agent,
-        realtime_monitoring_agent,
     ],
     context_schema=Context,
     state_schema=OrchestratorAgentState,

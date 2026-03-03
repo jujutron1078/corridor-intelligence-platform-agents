@@ -1,19 +1,19 @@
-from typing import Dict, List
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+RoutePriority = Literal["min_cost", "min_distance", "max_impact", "balance"]
+
+PRIORITY_DESCRIPTION = (
+    "What to optimize for: min_cost (cheapest route, budget primary), "
+    "min_distance (shortest route, time critical), "
+    "max_impact (most anchor loads, DFI development mandate), "
+    "balance (default; cost, distance, impact and co-location)."
+)
 
 
 class RouteOptimizationInput(BaseModel):
-    corridor_id: str = Field(..., description="Corridor ID from Tool 2")
-    anchor_nodes: List[Dict] = Field(
-        ..., description="Coordinates of detections from Tool 4"
-    )
-    cost_surface_uri: str = Field(
-        ..., description="The slope/difficulty map from Tool 5"
-    )
-    constraints_uri: str = Field(
-        ..., description="The No-Go zones from Tool 6"
-    )
-    priority: str = Field(
+    priority: RoutePriority = Field(
         default="balance",
-        description="Optimization goal: 'min_cost', 'min_distance', or 'max_impact'"
+        description=PRIORITY_DESCRIPTION,
     )

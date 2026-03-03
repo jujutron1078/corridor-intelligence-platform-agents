@@ -5,6 +5,14 @@ from src.shared.llm.models import SupportedLLM
 
 
 class Context(BaseModel):
+    project_name: str = Field(
+        default="None",
+        description="The name of the project",
+    )
+    project_id: str = Field(
+        default="None",
+        description="The id of the project",
+    )
     user_name: str = Field(
         default="James Kanyiri",
         description="The name of the user",

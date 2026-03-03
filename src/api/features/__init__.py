@@ -1,1 +1,1 @@
-"""Features API module."""
+"""API feature modules."""

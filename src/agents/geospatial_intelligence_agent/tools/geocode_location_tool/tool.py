@@ -1,12 +1,15 @@
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 
 from langchain.tools import tool, ToolRuntime
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 
-
 from .description import TOOL_DESCRIPTION
 from .schema import GeocodeLocationInput
+
+
 
 
 @tool("geocode_location", description=TOOL_DESCRIPTION)
@@ -15,8 +18,8 @@ def geocode_location_tool(
 ) -> Command:
     """
     Mock tool: resolve place names to coordinates. Returns mock lat/lon/confidence.
+    Dumps result to workspaces/{project_id}/project_data/ when project_id is set.
     """
-
     response = {
         "resolved_locations": [
             {

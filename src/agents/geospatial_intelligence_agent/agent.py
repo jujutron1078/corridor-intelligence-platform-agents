@@ -9,6 +9,9 @@ from src.shared.tools import think_tool, write_todos
 from src.agents.geospatial_intelligence_agent.tools.define_corridor_tool.tool import (
     define_corridor_tool,
 )
+from src.agents.geospatial_intelligence_agent.tools.environmental_constraints_tool.tool import (
+    environmental_constraints_tool,
+)
 from src.agents.geospatial_intelligence_agent.tools.fetch_geospatial_layers_tool.tool import (
     fetch_geospatial_layers_tool,
 )
@@ -35,6 +38,7 @@ agent = create_agent(
         fetch_geospatial_layers_tool,
         terrain_analysis_tool,
         infrastructure_detection_tool,
+        environmental_constraints_tool,
         route_optimization_tool,
     ],
     context_schema=Context,

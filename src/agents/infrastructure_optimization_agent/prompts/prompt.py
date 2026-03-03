@@ -123,15 +123,15 @@ User request
 
 - **Purpose:** Calculates least-cost paths within corridor proximity; refines Geospatial paths into engineering alignments within RoW.
 - **When to use:** Start of optimization when you have candidate routes and constraints.
-- **Parameters:** As in schema (routes, corridor envelope, RoW constraints).
-- **Common mistake:** Running without route or anchor context.
+- **Parameters:** None. Call with no input.
+- **Common mistake:** Passing arguments — this tool takes no parameters.
 
 ### quantify_colocation_benefits
 
 - **Purpose:** Models CAPEX savings from shared RoW, access roads, construction logistics (typically 15–25%).
 - **When to use:** After routes; to report savings and justify corridor approach.
-- **Parameters:** As in schema (route(s), highway alignment, unit costs).
-- **Common mistake:** Running before routes are refined.
+- **Parameters:** None. Call with no input.
+- **Common mistake:** Passing arguments — this tool takes no parameters.
 
 ### size_voltage_and_capacity
 
