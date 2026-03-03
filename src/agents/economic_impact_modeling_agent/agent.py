@@ -5,27 +5,27 @@ from src.agents.economic_impact_modeling_agent.context.context import Context
 from src.agents.economic_impact_modeling_agent.middleware.inject_context import inject_context
 from src.agents.economic_impact_modeling_agent.prompts.prompt import agent_prompt
 from src.agents.economic_impact_modeling_agent.state.state import EconomicImpactModelingAgentState
-from src.agents.economic_impact_modeling_agent.tools import (
-    econ_input_validator_tool,
-    econ_baseline_builder_tool,
-    econ_multiplier_model_tool,
-    econ_jobs_poverty_module_tool,
-    econ_scenario_runner_tool,
-    econ_output_packager_tool,
-)
 from src.shared.tools import think_tool, write_todos
+from src.agents.economic_impact_modeling_agent.tools import (
+    calculate_gdp_multipliers_tool,
+    model_employment_impact_tool,
+    assess_poverty_reduction_tool,
+    quantify_catalytic_effects_tool,
+    model_regional_integration_tool,
+    perform_impact_scenario_analysis_tool,
+)
 
 agent = create_agent(
     model=default_llm,
     tools=[
         think_tool,
         write_todos,
-        econ_input_validator_tool,
-        econ_baseline_builder_tool,
-        econ_multiplier_model_tool,
-        econ_jobs_poverty_module_tool,
-        econ_scenario_runner_tool,
-        econ_output_packager_tool,
+        calculate_gdp_multipliers_tool,
+        model_employment_impact_tool,
+        assess_poverty_reduction_tool,
+        quantify_catalytic_effects_tool,
+        model_regional_integration_tool,
+        perform_impact_scenario_analysis_tool,
     ],
     context_schema=Context,
     state_schema=EconomicImpactModelingAgentState,

@@ -6,13 +6,12 @@ from src.agents.stakeholder_intelligence_agent.middleware.inject_context import 
 from src.agents.stakeholder_intelligence_agent.prompts.prompt import agent_prompt
 from src.agents.stakeholder_intelligence_agent.state.state import StakeholderIntelligenceAgentState
 from src.agents.stakeholder_intelligence_agent.tools import (
-    stake_input_validator_tool,
-    stake_harvesting_tool,
-    stake_entity_resolution_tool,
-    stake_influence_graph_tool,
-    stake_engagement_planner_tool,
-    stake_risk_register_tool,
-    stake_output_packager_tool,
+    map_stakeholder_ecosystem_tool,
+    analyze_influence_networks_tool,
+    generate_engagement_roadmap_tool,
+    assess_stakeholder_risks_tool,
+    generate_tailored_messaging_tool,
+    track_engagement_sentiment_tool,
 )
 from src.shared.tools import think_tool, write_todos
 
@@ -21,13 +20,12 @@ agent = create_agent(
     tools=[
         think_tool,
         write_todos,
-        stake_input_validator_tool,
-        stake_harvesting_tool,
-        stake_entity_resolution_tool,
-        stake_influence_graph_tool,
-        stake_engagement_planner_tool,
-        stake_risk_register_tool,
-        stake_output_packager_tool,
+        map_stakeholder_ecosystem_tool,
+        analyze_influence_networks_tool,
+        generate_engagement_roadmap_tool,
+        assess_stakeholder_risks_tool,
+        generate_tailored_messaging_tool,
+        track_engagement_sentiment_tool,
     ],
     context_schema=Context,
     state_schema=StakeholderIntelligenceAgentState,

@@ -6,13 +6,12 @@ from src.agents.financing_optimization_agent.middleware.inject_context import in
 from src.agents.financing_optimization_agent.prompts.prompt import agent_prompt
 from src.agents.financing_optimization_agent.state.state import FinancingOptimizationAgentState
 from src.agents.financing_optimization_agent.tools import (
-    fin_input_validator_tool,
-    fin_base_model_tool,
-    fin_scenario_generator_tool,
-    fin_optimizer_tool,
-    fin_monte_carlo_risk_tool,
-    fin_term_sheet_synthesizer_tool,
-    fin_output_packager_tool,
+    match_dfi_institutions_tool,
+    generate_financing_scenarios_tool,
+    build_financial_model_tool,
+    perform_risk_and_sensitivity_analysis_tool,
+    optimize_debt_terms_tool,
+    model_credit_enhancement_tool,
 )
 from src.shared.tools import think_tool, write_todos
 
@@ -21,13 +20,12 @@ agent = create_agent(
     tools=[
         think_tool,
         write_todos,
-        fin_input_validator_tool,
-        fin_base_model_tool,
-        fin_scenario_generator_tool,
-        fin_optimizer_tool,
-        fin_monte_carlo_risk_tool,
-        fin_term_sheet_synthesizer_tool,
-        fin_output_packager_tool,
+        match_dfi_institutions_tool,
+        generate_financing_scenarios_tool,
+        build_financial_model_tool,
+        perform_risk_and_sensitivity_analysis_tool,
+        optimize_debt_terms_tool,
+        model_credit_enhancement_tool,
     ],
     context_schema=Context,
     state_schema=FinancingOptimizationAgentState,
