@@ -1,25 +1,33 @@
 {
-  "graphs": {
-    "orchestrator_agent": "src/agents/orchestrator_agent/agent.py:agent",
-    "geospatial_intelligence_agent": "src/agents/geospatial_intelligence_agent/agent.py:agent",
-    "opportunity_identification_agent": "src/agents/opportunity_identification_agent/agent.py:agent",
-    "infrastructure_optimization_agent": "src/agents/infrastructure_optimization_agent/agent.py:agent",
-    "economic_impact_modeling_agent": "src/agents/economic_impact_modeling_agent/agent.py:agent",
-    "financing_optimization_agent": "src/agents/financing_optimization_agent/agent.py:agent",
-    "stakeholder_intelligence_agent": "src/agents/stakeholder_intelligence_agent/agent.py:agent",
-    "realtime_monitoring_agent": "src/agents/realtime_monitoring_agent/agent.py:agent"
-  },
-  "dependencies": [
-    "."
-  ],
-  "env": "./.env",
-  "python_version": "3.13",
-  "http": {
-    "app": "src/api/main.py:app"
-  },
-  "cors": {
-    "allow_origins": ["*"],
-    "allow_methods": ["GET", "POST", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization"]
-  }
+    "graphs": {
+        "orchestrator_agent": "src/agents/orchestrator_agent/agent.py:agent",
+        "geospatial_intelligence_agent": "src/agents/geospatial_intelligence_agent/agent.py:agent",
+        "opportunity_identification_agent": "src/agents/opportunity_identification_agent/agent.py:agent",
+        "infrastructure_optimization_agent": "src/agents/infrastructure_optimization_agent/agent.py:agent",
+        "economic_impact_modeling_agent": "src/agents/economic_impact_modeling_agent/agent.py:agent",
+        "financing_optimization_agent": "src/agents/financing_optimization_agent/agent.py:agent",
+        "stakeholder_intelligence_agent": "src/agents/stakeholder_intelligence_agent/agent.py:agent"
+    },
+    "dependencies": [
+        "."
+    ],
+    "env": "./.env",
+    "python_version": "3.13",
+    "http": {
+        "app": "src/api/main.py:app"
+    },
+    "cors": {
+        "allow_origins": [
+            "*"
+        ],
+        "allow_methods": [
+            "GET",
+            "POST",
+            "OPTIONS"
+        ],
+        "allow_headers": [
+            "Content-Type",
+            "Authorization"
+        ]
+    }
 }

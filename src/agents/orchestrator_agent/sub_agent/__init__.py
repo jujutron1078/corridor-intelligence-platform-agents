@@ -12,8 +12,6 @@ from .financing_optimization_agent.agent import financing_optimization_agent
 from .stakeholder_intelligence_agent.agent import (
     stakeholder_intelligence_agent,
 )
-from .realtime_monitoring_agent.agent import realtime_monitoring_agent
-
 __all__ = [
     "geospatial_intelligence_agent",
     "opportunity_identification_agent",
@@ -21,6 +19,5 @@ __all__ = [
     "economic_impact_modeling_agent",
     "financing_optimization_agent",
     "stakeholder_intelligence_agent",
-    "realtime_monitoring_agent",
 ]
 
