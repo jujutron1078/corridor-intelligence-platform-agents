@@ -34,26 +34,13 @@ RUN rm -rf /usr/local/lib/python*/site-packages/pip* /usr/local/lib/python*/site
 RUN rm -rf /usr/lib/python*/site-packages/pip* /usr/lib/python*/site-packages/setuptools* /usr/lib/python*/site-packages/wheel* && find /usr/bin -name "pip*" -delete || true
 RUN uv pip uninstall --system pip setuptools wheel && rm -f /usr/bin/uv /usr/bin/uvx || true
 
-# Bake data from R2 into the image at BUILD time — no runtime download needed.
-# Railway passes build args from env vars automatically.
-ARG R2_ACCESS_KEY
-ARG R2_SECRET_KEY
-ARG R2_ENDPOINT
-RUN mkdir -p /data && \
-    if [ -n "$R2_ACCESS_KEY" ] && [ -n "$R2_SECRET_KEY" ] && [ -n "$R2_ENDPOINT" ]; then \
-        echo "Syncing data from R2 into image..." && \
-        rclone sync \
-            ":s3,provider=Cloudflare,access_key_id=$R2_ACCESS_KEY,secret_access_key=$R2_SECRET_KEY,endpoint=$R2_ENDPOINT:corridor-data/v1/data" \
-            /data \
-            --transfers=8 --fast-list && \
-        echo "Data baked: $(du -sh /data | cut -f1)" ; \
-    else \
-        echo "WARNING: R2 credentials not provided as build args — /data will be empty." ; \
-    fi
+WORKDIR /deps/agents
+
+RUN chmod +x /deps/agents/entrypoint.sh
 
 ENV CORRIDOR_DATA_ROOT=/data
 
-WORKDIR /deps/agents
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/healthz/live')" || exit 1
+
+ENTRYPOINT ["/deps/agents/entrypoint.sh"]
