@@ -28,4 +28,4 @@ ENV PORT=8000
 
 EXPOSE ${PORT}
 
-CMD ["sh", "-c", "python -c \"from entrypoint_sync import sync; sync()\" 2>/dev/null; uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT}"]

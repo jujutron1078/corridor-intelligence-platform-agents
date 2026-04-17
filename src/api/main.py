@@ -26,11 +26,27 @@ from src.shared.pipeline.utils import setup_logging
 logger = logging.getLogger("corridor.api")
 
 
+def _background_data_sync():
+    """Download pipeline data from R2 in a background thread (non-blocking)."""
+    import threading
+    def _sync():
+        try:
+            from entrypoint_sync import sync
+            sync()
+        except Exception as exc:
+            logger.warning("Background data sync failed: %s", exc)
+    t = threading.Thread(target=_sync, daemon=True, name="r2-data-sync")
+    t.start()
+    return t
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
     setup_logging()
     logger.info("Starting Corridor Intelligence Platform API...")
+
+    _background_data_sync()
 
     # Initialize pipeline services
     _services = [
