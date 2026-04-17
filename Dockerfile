@@ -36,11 +36,5 @@ RUN uv pip uninstall --system pip setuptools wheel && rm -f /usr/bin/uv /usr/bin
 
 WORKDIR /deps/agents
 
-RUN chmod +x /deps/agents/entrypoint.sh
-
 ENV CORRIDOR_DATA_ROOT=/data
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/healthz/live')" || exit 1
-
-ENTRYPOINT ["/deps/agents/entrypoint.sh"]
+RUN mkdir -p /data
