@@ -1,5 +1,5 @@
 from langchain.agents.middleware import dynamic_prompt, ModelRequest
-from src.shared.utils.get_today_str import get_today_str
+from src.shared.agents.utils.get_today_str import get_today_str
 
 
 ECONOMIC_IMPACT_MODELING_PROMPT = """

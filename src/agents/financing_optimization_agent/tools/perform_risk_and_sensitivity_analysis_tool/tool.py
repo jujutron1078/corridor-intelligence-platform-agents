@@ -1,4 +1,8 @@
+import copy
 import json
+import logging
+import random
+
 from langchain.tools import tool, ToolRuntime
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
@@ -6,430 +10,306 @@ from langgraph.types import Command
 from .description import TOOL_DESCRIPTION
 from .schema import RiskAnalysisInput
 
+logger = logging.getLogger("corridor.agent.financing.risk_analysis")
+
+# Sensitivity variables with default ranges
+DEFAULT_VARIABLES = [
+    {
+        "variable": "Anchor Load Revenue Realization",
+        "base": 0.85, "low": 0.60, "high": 1.00,
+        "irr_sensitivity": 0.033,  # IRR change per 10% variable change
+        "dscr_sensitivity": 0.012,
+        "label": "CRITICAL",
+    },
+    {
+        "variable": "Construction CAPEX Overrun",
+        "base": 0.0, "low": 0.25, "high": -0.05,
+        "irr_sensitivity": -0.018,
+        "dscr_sensitivity": -0.007,
+        "label": "HIGH",
+    },
+    {
+        "variable": "Currency Devaluation (Local vs USD)",
+        "base": 0.025, "low": 0.08, "high": 0.0,
+        "irr_sensitivity": -0.020,
+        "dscr_sensitivity": -0.005,
+        "label": "HIGH",
+    },
+    {
+        "variable": "Construction Timeline Delay (months)",
+        "base": 0, "low": 18, "high": -3,
+        "irr_sensitivity": -0.015,
+        "dscr_sensitivity": -0.005,
+        "label": "HIGH",
+    },
+    {
+        "variable": "Commercial Interest Rate (SOFR)",
+        "base": 0.053, "low": 0.073, "high": 0.038,
+        "irr_sensitivity": -0.010,
+        "dscr_sensitivity": -0.003,
+        "label": "MEDIUM",
+    },
+    {
+        "variable": "Transmission Tariff Level",
+        "base": 0.021, "low": 0.015, "high": 0.026,
+        "irr_sensitivity": 0.019,
+        "dscr_sensitivity": 0.005,
+        "label": "MEDIUM",
+    },
+    {
+        "variable": "OPEX Escalation Rate",
+        "base": 0.025, "low": 0.05, "high": 0.015,
+        "irr_sensitivity": -0.006,
+        "dscr_sensitivity": -0.002,
+        "label": "LOW",
+    },
+]
+
+# Correlation pairs
+CORRELATION_PAIRS = [
+    ("Currency Devaluation (Local vs USD)", "Anchor Load Revenue Realization", 0.68,
+     "Currency crises reduce industrial output and power demand simultaneously"),
+    ("Construction Timeline Delay (months)", "Construction CAPEX Overrun", 0.72,
+     "Delays almost always accompany cost overruns — same root causes"),
+    ("Commercial Interest Rate (SOFR)", "Currency Devaluation (Local vs USD)", 0.55,
+     "USD strengthening periods coincide with local currency weakness"),
+]
+
 
 @tool("perform_risk_and_sensitivity_analysis", description=TOOL_DESCRIPTION)
 def perform_risk_and_sensitivity_analysis_tool(
     payload: RiskAnalysisInput, runtime: ToolRuntime
 ) -> Command:
-    """Runs 10,000 simulations to determine the probability distribution of returns."""
+    """Runs sensitivity and scenario analysis to determine risk profile."""
+    from src.adapters.pipeline_bridge import pipeline_bridge
 
-    # In a real-world scenario, this tool would:
-    # 1. Extract all variable assumptions from the financial model (Tool 3 output).
-    # 2. Define probability distributions for each variable (normal, triangular, uniform)
-    #    based on historical project data from comparable African infrastructure deals.
-    # 3. Run a Monte Carlo simulation with 10,000+ iterations, sampling from each
-    #    distribution simultaneously using Latin Hypercube Sampling for efficiency.
-    # 4. For each iteration, recompute the full DCF and record: equity IRR, project IRR,
-    #    NPV, min DSCR, and payback period.
-    # 5. Build a tornado diagram by running one-at-a-time sensitivity analysis:
-    #    vary each input across its range while holding all others at base case.
-    #    Rank variables by total IRR swing (high – low).
-    # 6. Compute break-even thresholds: the minimum value each variable can take
-    #    before equity IRR drops below target or DSCR breaches covenant floor.
-    # 7. Flag any scenario where DSCR < 1.30x as a lender covenant breach event
-    #    and report its probability.
-    # 8. Produce a correlation matrix to identify which variables move together
-    #    (e.g., currency devaluation + revenue shortfall often co-move in West Africa).
+    model_data = payload.financial_model_data or {}
+    variances = payload.variable_variances or {}
+
+    # Work on a copy to avoid mutating the module-level defaults
+    sensitivity_variables = copy.deepcopy(DEFAULT_VARIABLES)
+
+    # Extract base case from model data or use defaults
+    base_irr = model_data.get("equity_irr", 0.151)
+    if isinstance(base_irr, str):
+        base_irr = float(base_irr.replace("%", "")) / 100
+    base_dscr = model_data.get("min_dscr", 1.42)
+    base_npv = model_data.get("npv_usd", 218_000_000)
+    target_irr = 0.14
+    dscr_covenant = 1.30
+
+    # Get conflict data for political risk context
+    conflict_context = None
+    try:
+        conflict = pipeline_bridge.get_conflict_data()
+        conflict_context = {
+            "total_events": conflict.get("total_events", 0),
+            "risk_level": conflict.get("risk_level", "unknown"),
+        }
+    except Exception as exc:
+        logger.warning("Conflict data unavailable: %s", exc)
+
+    # Get WB indicators for macro risk context
+    macro_context = None
+    try:
+        wb = pipeline_bridge.get_worldbank_indicators()
+        macro_context = wb.get("indicators")
+    except Exception as exc:
+        logger.warning("World Bank data unavailable: %s", exc)
+
+    # Get sovereign risk data — real CPI and governance scores
+    sovereign_risk_context = None
+    try:
+        sov = pipeline_bridge.get_sovereign_risk()
+        if sov.get("status") == "ok":
+            cpi_scores = sov.get("cpi_scores", [])
+            governance = sov.get("governance", {})
+            sovereign_risk_context = {
+                "cpi_scores": cpi_scores,
+                "governance_indices": governance,
+                "source": sov.get("source", "TI/V-Dem"),
+            }
+            # Adjust political risk sensitivity based on actual CPI scores
+            # CPI range 0-100 (higher = cleaner); low CPI → higher political risk
+            if cpi_scores:
+                avg_cpi = sum(
+                    s.get("score", 50) for s in cpi_scores
+                ) / len(cpi_scores)
+                # Scale: CPI < 30 = high risk, 30-50 = medium, > 50 = lower
+                political_risk_factor = max(0.5, min(2.0, (60 - avg_cpi) / 30))
+                # Adjust currency devaluation sensitivity by political risk
+                for var in sensitivity_variables:
+                    if "Currency Devaluation" in var["variable"]:
+                        var["irr_sensitivity"] = round(var["irr_sensitivity"] * political_risk_factor, 4)
+                        var["dscr_sensitivity"] = round(var["dscr_sensitivity"] * political_risk_factor, 4)
+    except Exception as exc:
+        logger.warning("Sovereign risk data unavailable: %s", exc)
+
+    # Get IMF indicators for macro risk context (GDP growth, inflation, debt)
+    imf_macro_context = None
+    try:
+        imf = pipeline_bridge.get_imf_indicators()
+        if imf.get("status") == "ok":
+            imf_macro_context = {
+                "indicators": imf.get("indicators", {}),
+                "source": imf.get("source", "IMF WEO"),
+            }
+    except Exception as exc:
+        logger.warning("IMF indicators unavailable: %s", exc)
+
+    # Tornado diagram — one-at-a-time sensitivity
+    tornado = []
+    for var in sensitivity_variables:
+        # Apply variance overrides if provided
+        var_key = var["variable"].lower().replace(" ", "_")[:10]
+        variance = variances.get(var_key, abs(var["high"] - var["low"]) / 2)
+
+        irr_swing = abs(var["irr_sensitivity"]) * 20  # full range swing
+        irr_low = round(base_irr + var["irr_sensitivity"] * -10, 3)
+        irr_high = round(base_irr + var["irr_sensitivity"] * 10, 3)
+
+        dscr_low = round(base_dscr + var["dscr_sensitivity"] * -10, 2)
+
+        tornado.append({
+            "rank": len(tornado) + 1,
+            "variable": var["variable"],
+            "base_case": var["base"],
+            "low_case": var["low"],
+            "high_case": var["high"],
+            "irr_low_case": f"{irr_low * 100:.1f}%",
+            "irr_high_case": f"{irr_high * 100:.1f}%",
+            "irr_swing": f"{abs(irr_high - irr_low) * 100:.1f}%",
+            "dscr_impact_low": f"{dscr_low:.2f}x",
+            "sensitivity_label": var["label"],
+        })
+
+    # Sort by IRR swing
+    tornado.sort(key=lambda x: float(x["irr_swing"].replace("%", "")), reverse=True)
+    for i, t in enumerate(tornado):
+        t["rank"] = i + 1
+
+    # Monte Carlo simulation (simplified — 1000 iterations with random sampling)
+    n_iterations = 1000
+    random.seed(42)  # reproducible
+    irr_results = []
+    dscr_results = []
+    npv_results = []
+
+    for _ in range(n_iterations):
+        irr_shift = 0
+        dscr_shift = 0
+        for var in sensitivity_variables:
+            shock = random.gauss(0, abs(var["irr_sensitivity"]) * 3)
+            irr_shift += shock
+            dscr_shift += random.gauss(0, abs(var["dscr_sensitivity"]) * 3)
+
+        sim_irr = base_irr + irr_shift
+        sim_dscr = base_dscr + dscr_shift
+        sim_npv = base_npv * (1 + irr_shift * 5)
+
+        irr_results.append(sim_irr)
+        dscr_results.append(sim_dscr)
+        npv_results.append(sim_npv)
+
+    irr_results.sort()
+    dscr_results.sort()
+    npv_results.sort()
+
+    p10_idx = int(n_iterations * 0.10)
+    p50_idx = int(n_iterations * 0.50)
+    p90_idx = int(n_iterations * 0.90)
+
+    prob_above_target = sum(1 for r in irr_results if r >= target_irr) / n_iterations
+    prob_dscr_breach = sum(1 for r in dscr_results if r < dscr_covenant) / n_iterations
+    prob_npv_positive = sum(1 for r in npv_results if r > 0) / n_iterations
+
+    # Break-even analysis
+    break_evens = []
+    for var in sensitivity_variables[:4]:  # top 4 critical variables
+        headroom = abs(base_irr - target_irr) / max(abs(var["irr_sensitivity"]), 0.001)
+        break_evens.append({
+            "variable": var["variable"],
+            "headroom_from_base": f"{headroom:.0f}% movement tolerated",
+        })
+
+    # Correlation risks
+    corr_risks = []
+    for var_a, var_b, corr, explanation in CORRELATION_PAIRS:
+        sens_a = next((v for v in sensitivity_variables if v["variable"] == var_a), None)
+        sens_b = next((v for v in sensitivity_variables if v["variable"] == var_b), None)
+        combined_irr = base_irr
+        if sens_a and sens_b:
+            combined_irr = base_irr + (sens_a["irr_sensitivity"] + sens_b["irr_sensitivity"]) * -5
+        corr_risks.append({
+            "variable_a": var_a,
+            "variable_b": var_b,
+            "correlation": corr,
+            "explanation": explanation,
+            "combined_downside_irr": f"{combined_irr * 100:.1f}%",
+            "risk_level": "HIGH" if corr >= 0.6 else "MEDIUM",
+        })
 
     response = {
-
-        # ------------------------------------------------------------------ #
-        #  SIMULATION CONFIGURATION                                            #
-        #  Production: configured dynamically from variable_variances input.  #
-        #  Mock: pre-set for Abidjan-Lagos $900M corridor infrastructure.     #
-        # ------------------------------------------------------------------ #
+        "corridor_id": "AL_CORRIDOR_001",
+        "analysis_type": "Risk & Sensitivity Analysis",
         "simulation_configuration": {
-            "iterations": 10_000,
-            "sampling_method": "Latin Hypercube Sampling (LHS)",
-            "base_case_equity_irr": "15.1%",
-            "base_case_project_irr": "10.3%",
-            "base_case_min_dscr": 1.42,
-            "base_case_npv_usd": 218_000_000,
-            "variables_modelled": 12,
-            "correlation_matrix_applied": True,
-            "covenant_floor_dscr": 1.30,
-            "target_equity_irr": "14.0%"
+            "iterations": n_iterations,
+            "variables_modelled": len(sensitivity_variables),
+            "base_case_equity_irr": f"{base_irr * 100:.1f}%",
+            "base_case_min_dscr": base_dscr,
+            "base_case_npv_usd": base_npv,
+            "target_equity_irr": f"{target_irr * 100:.1f}%",
+            "covenant_floor_dscr": dscr_covenant,
         },
-
-        # ------------------------------------------------------------------ #
-        #  MONTE CARLO RESULTS                                                 #
-        #  Production: computed from 10,000-iteration simulation engine.      #
-        #  Mock: pre-built reflecting realistic West African project outcomes. #
-        # ------------------------------------------------------------------ #
         "monte_carlo_results": {
-
-            # --- Equity IRR Distribution ---
             "equity_irr_distribution": {
-                "prob_irr_above_14_percent": "71.4%",     # Above target
-                "prob_irr_above_12_percent": "88.2%",     # Above minimum acceptable
-                "prob_irr_above_10_percent": "96.1%",     # Above DFI floor
-                "prob_irr_below_8_percent": "1.3%",       # Tail risk
-                "p10_irr": "17.8%",                       # Best 10% of outcomes
-                "p50_irr": "14.9%",                       # Median outcome
-                "p90_irr": "11.2%",                       # Worst 10% of outcomes
-                "mean_irr": "14.6%",
-                "std_deviation": "2.1%",
-                "skewness": "-0.34",                      # Slight left skew — downside tail
-                "interpretation": (
-                    "71.4% probability of exceeding 14% target IRR. "
-                    "P90 IRR of 11.2% remains above the 10% DFI floor, "
-                    "indicating resilience even in adverse scenarios."
-                )
+                "prob_above_target": f"{prob_above_target * 100:.1f}%",
+                "p10_irr": f"{irr_results[p90_idx] * 100:.1f}%",
+                "p50_irr": f"{irr_results[p50_idx] * 100:.1f}%",
+                "p90_irr": f"{irr_results[p10_idx] * 100:.1f}%",
+                "mean_irr": f"{sum(irr_results) / n_iterations * 100:.1f}%",
             },
-
-            # --- DSCR Distribution ---
             "dscr_distribution": {
-                "prob_dscr_above_1_40x": "68.3%",
-                "prob_dscr_above_1_30x": "84.7%",         # Above covenant floor
-                "prob_covenant_breach": "15.3%",           # DSCR drops below 1.30x
-                "p50_min_dscr": "1.41x",
-                "p90_min_dscr": "1.19x",                   # Worst 10% — breaches covenant
-                "mean_min_dscr": "1.44x",
-                "covenant_breach_primary_driver": "Revenue shortfall >18% combined with CAPEX overrun >12%",
-                "interpretation": (
-                    "15.3% probability of DSCR covenant breach is above the 10% lender comfort threshold. "
-                    "Credit enhancement (Tool 6) or a cash flow sweep reserve account is recommended "
-                    "to bring breach probability below 8%."
-                )
+                "prob_covenant_breach": f"{prob_dscr_breach * 100:.1f}%",
+                "p50_min_dscr": f"{dscr_results[p50_idx]:.2f}x",
+                "p90_min_dscr": f"{dscr_results[p10_idx]:.2f}x",
             },
-
-            # --- NPV Distribution ---
             "npv_distribution": {
-                "prob_npv_positive": "91.4%",
-                "p50_npv_usd": 204_000_000,
-                "p90_npv_usd": 48_000_000,                 # Still positive in worst decile
-                "p10_npv_usd": 387_000_000,
-                "mean_npv_usd": 211_000_000
-            }
+                "prob_npv_positive": f"{prob_npv_positive * 100:.1f}%",
+                "p50_npv_usd": round(npv_results[p50_idx]),
+                "mean_npv_usd": round(sum(npv_results) / n_iterations),
+            },
         },
-
-        # ------------------------------------------------------------------ #
-        #  TORNADO DIAGRAM — SENSITIVITY ANALYSIS                             #
-        #  Production: computed by one-at-a-time sensitivity runs.            #
-        #  Mock: ranked by IRR swing for Abidjan-Lagos base case.             #
-        # ------------------------------------------------------------------ #
         "tornado_diagram": {
             "metric_analysed": "Equity IRR",
-            "base_case": "15.1%",
-            "note": "Variables ranked by total IRR swing (high case minus low case). Wider bar = higher impact.",
-            "variables": [
-                {
-                    "rank": 1,
-                    "variable": "Anchor Load Revenue Realization",
-                    "description": "% of projected anchor load demand that materializes by Year 3",
-                    "base_case_assumption": "85% realization",
-                    "low_case": "60% realization",
-                    "high_case": "100% realization",
-                    "irr_low_case": "10.8%",
-                    "irr_high_case": "17.9%",
-                    "irr_swing": "7.1%",
-                    "dscr_impact_low": "1.19x (covenant breach risk)",
-                    "sensitivity_label": "CRITICAL",
-                    "mitigation": "Secure take-or-pay off-take contracts before financial close"
-                },
-                {
-                    "rank": 2,
-                    "variable": "Construction CAPEX Overrun",
-                    "description": "% cost overrun above base case $900M CAPEX",
-                    "base_case_assumption": "0% overrun",
-                    "low_case": "+25% overrun ($225M)",
-                    "high_case": "-5% under budget (-$45M)",
-                    "irr_low_case": "11.4%",
-                    "irr_high_case": "15.9%",
-                    "irr_swing": "4.5%",
-                    "dscr_impact_low": "1.28x (near covenant breach)",
-                    "sensitivity_label": "HIGH",
-                    "mitigation": "Fixed-price EPC contract with performance bonds; 15% contingency reserve"
-                },
-                {
-                    "rank": 3,
-                    "variable": "Currency Devaluation (NGN/XOF vs USD)",
-                    "description": "Depreciation of local currencies reduces USD-equivalent revenue",
-                    "base_case_assumption": "2.5% annual depreciation",
-                    "low_case": "8% annual depreciation",
-                    "high_case": "0% (stable)",
-                    "irr_low_case": "11.9%",
-                    "irr_high_case": "16.1%",
-                    "irr_swing": "4.2%",
-                    "dscr_impact_low": "1.31x (just above covenant)",
-                    "sensitivity_label": "HIGH",
-                    "mitigation": "USD-denominated tariffs for cross-border wheeling; currency swap for NGN revenue tranche"
-                },
-                {
-                    "rank": 4,
-                    "variable": "Construction Timeline Delay",
-                    "description": "Delay in commercial operations start date (months)",
-                    "base_case_assumption": "0 months delay",
-                    "low_case": "18-month delay",
-                    "high_case": "3-month early completion",
-                    "irr_low_case": "12.3%",
-                    "irr_high_case": "15.6%",
-                    "irr_swing": "3.3%",
-                    "dscr_impact_low": "1.33x (above covenant but stressed)",
-                    "sensitivity_label": "HIGH",
-                    "mitigation": "Phased construction aligned with highway corridor; liquidated damages in EPC contract"
-                },
-                {
-                    "rank": 5,
-                    "variable": "Commercial Interest Rate (SOFR)",
-                    "description": "Movement in SOFR base rate affecting commercial debt tranche",
-                    "base_case_assumption": "SOFR = 5.3% (current)",
-                    "low_case": "SOFR + 200bps = 7.3%",
-                    "high_case": "SOFR - 150bps = 3.8%",
-                    "irr_low_case": "13.1%",
-                    "irr_high_case": "16.2%",
-                    "irr_swing": "3.1%",
-                    "dscr_impact_low": "1.36x",
-                    "sensitivity_label": "MEDIUM",
-                    "mitigation": "Interest rate swap to fix commercial debt rate at financial close"
-                },
-                {
-                    "rank": 6,
-                    "variable": "Transmission Tariff Level",
-                    "description": "Regulated wheeling tariff set by national utility regulators",
-                    "base_case_assumption": "$0.021/kWh blended",
-                    "low_case": "$0.015/kWh (-29%)",
-                    "high_case": "$0.026/kWh (+24%)",
-                    "irr_low_case": "13.0%",
-                    "irr_high_case": "16.8%",
-                    "irr_swing": "3.8%",
-                    "dscr_impact_low": "1.32x",
-                    "sensitivity_label": "MEDIUM",
-                    "mitigation": "Lock in cost-reflective tariff methodology in concession agreements before construction"
-                },
-                {
-                    "rank": 7,
-                    "variable": "OPEX Escalation",
-                    "description": "Annual operating cost growth rate above base 2.5%",
-                    "base_case_assumption": "2.5% per annum",
-                    "low_case": "5.0% per annum",
-                    "high_case": "1.5% per annum",
-                    "irr_low_case": "14.1%",
-                    "irr_high_case": "15.6%",
-                    "irr_swing": "1.5%",
-                    "dscr_impact_low": "1.39x",
-                    "sensitivity_label": "LOW",
-                    "mitigation": "Long-term O&M contracts with indexed caps; in-house maintenance capability"
-                },
-                {
-                    "rank": 8,
-                    "variable": "Inflation Rate (West Africa)",
-                    "description": "Regional inflation affecting local cost base",
-                    "base_case_assumption": "4.5% blended",
-                    "low_case": "8.0%",
-                    "high_case": "2.5%",
-                    "irr_low_case": "14.3%",
-                    "irr_high_case": "15.5%",
-                    "irr_swing": "1.2%",
-                    "dscr_impact_low": "1.40x",
-                    "sensitivity_label": "LOW",
-                    "mitigation": "USD-denominated contracts for major equipment and EPC"
-                }
-            ]
+            "base_case": f"{base_irr * 100:.1f}%",
+            "variables": tornado,
         },
-
-        # ------------------------------------------------------------------ #
-        #  BREAK-EVEN ANALYSIS                                                 #
-        #  Production: computed by binary search on each variable.            #
-        #  Mock: pre-calculated thresholds for critical variables.            #
-        # ------------------------------------------------------------------ #
-        "break_even_analysis": {
-            "metric": "Equity IRR = 14.0% (target floor)",
-            "thresholds": [
-                {
-                    "variable": "Anchor Load Revenue Realization",
-                    "break_even_value": "71% realization",
-                    "headroom_from_base": "14 percentage points below base (85%)",
-                    "interpretation": "Revenue can fall 14pp below base before IRR target is missed"
-                },
-                {
-                    "variable": "CAPEX Overrun",
-                    "break_even_value": "+19% overrun ($171M)",
-                    "headroom_from_base": "$171M buffer above base CAPEX",
-                    "interpretation": "Project tolerates up to $171M cost overrun before missing IRR target"
-                },
-                {
-                    "variable": "Construction Delay",
-                    "break_even_value": "14-month delay",
-                    "headroom_from_base": "14 months before IRR target missed",
-                    "interpretation": "Standard EPC buffer but tight — early completion incentives recommended"
-                },
-                {
-                    "variable": "Transmission Tariff",
-                    "break_even_value": "$0.017/kWh",
-                    "headroom_from_base": "19% below base tariff of $0.021/kWh",
-                    "interpretation": "Tariff can be cut 19% before IRR target is missed — moderate buffer"
-                }
-            ],
-            "dscr_covenant_break_even": {
-                "metric": "Min DSCR = 1.30x (covenant floor)",
-                "revenue_shortfall_threshold": "Revenue must not fall below 72% of base case in any single year",
-                "combined_stress_threshold": "CAPEX overrun >12% AND revenue shortfall >10% simultaneously triggers breach",
-                "probability_of_combined_stress": "8.4% — above 5% lender comfort level"
-            }
-        },
-
-        # ------------------------------------------------------------------ #
-        #  CORRELATION MATRIX — KEY VARIABLE PAIRS                            #
-        #  Production: computed from historical West African project data.    #
-        #  Mock: pre-assessed for corridor-specific co-movement risks.        #
-        # ------------------------------------------------------------------ #
-        "correlation_risks": {
-            "note": "Correlated variables that move together amplify downside scenarios beyond single-variable analysis.",
-            "high_correlation_pairs": [
-                {
-                    "variable_a": "Currency Devaluation",
-                    "variable_b": "Anchor Load Revenue Shortfall",
-                    "correlation": 0.68,
-                    "explanation": "Currency crises in West Africa historically reduce industrial output and therefore power demand simultaneously",
-                    "combined_downside_irr": "9.4%",
-                    "risk_level": "HIGH"
-                },
-                {
-                    "variable_a": "Construction Delay",
-                    "variable_b": "CAPEX Overrun",
-                    "correlation": 0.72,
-                    "explanation": "Delays almost always accompany cost overruns in African infrastructure — same root causes (permitting, logistics)",
-                    "combined_downside_irr": "10.1%",
-                    "risk_level": "HIGH"
-                },
-                {
-                    "variable_a": "SOFR Rate Increase",
-                    "variable_b": "Currency Devaluation",
-                    "correlation": 0.55,
-                    "explanation": "USD strengthening periods coincide with local currency weakness, raising debt cost while compressing local revenue",
-                    "combined_downside_irr": "11.8%",
-                    "risk_level": "MEDIUM"
-                }
-            ]
-        },
-
-        # ------------------------------------------------------------------ #
-        #  CRITICAL RISKS SUMMARY                                             #
-        #  Production: ranked by probability × impact (expected loss).        #
-        #  Mock: pre-ranked for Abidjan-Lagos corridor risk profile.          #
-        # ------------------------------------------------------------------ #
-        "critical_risks": [
-            {
-                "rank": 1,
-                "risk": "Anchor load revenue realization below 71%",
-                "probability": "22%",
-                "irr_impact": "-4.3% on equity IRR",
-                "dscr_impact": "Potential covenant breach if below 65%",
-                "severity": "CRITICAL",
-                "mitigation": "Execute take-or-pay off-take contracts with Dangote, Lekki FTZ, and Obuasi Mine before financial close. These 3 alone cover 38% of Year 1 revenue."
-            },
-            {
-                "rank": 2,
-                "risk": "CAPEX overrun exceeding 19% ($171M)",
-                "probability": "18%",
-                "irr_impact": "-2.8% on equity IRR",
-                "dscr_impact": "1.28x min DSCR — near covenant breach",
-                "severity": "HIGH",
-                "mitigation": "Fixed-price lump-sum EPC contract with 10% performance bond. Retain 15% contingency in reserve account."
-            },
-            {
-                "rank": 3,
-                "risk": "NGN/XOF currency devaluation >8% annually",
-                "probability": "24%",
-                "irr_impact": "-3.2% on equity IRR",
-                "dscr_impact": "1.31x min DSCR — just above covenant",
-                "severity": "HIGH",
-                "mitigation": "Structure cross-border wheeling tariffs in USD. Arrange currency swap for NGN revenue tranche with a local commercial bank."
-            },
-            {
-                "rank": 4,
-                "risk": "Construction delay >14 months",
-                "probability": "31%",
-                "irr_impact": "-1.9% on equity IRR",
-                "dscr_impact": "Interest during construction increases, equity injection timing impacted",
-                "severity": "HIGH",
-                "mitigation": "Phased construction strategy — Phase 1 segments serve highest anchor load density first, generating early revenue."
-            },
-            {
-                "rank": 5,
-                "risk": "Regulatory tariff review reduces wheeling rate below $0.017/kWh",
-                "probability": "14%",
-                "irr_impact": "-2.1% on equity IRR",
-                "dscr_impact": "1.33x min DSCR",
-                "severity": "MEDIUM",
-                "mitigation": "Lock in cost-reflective tariff methodology in concession agreements with all 5 national regulators before financial close."
-            },
-            {
-                "rank": 6,
-                "risk": "Political risk — expropriation or contract renegotiation in 1+ countries",
-                "probability": "8%",
-                "irr_impact": "Potentially catastrophic in isolated country",
-                "dscr_impact": "Depends on affected country's revenue share",
-                "severity": "MEDIUM",
-                "mitigation": "MIGA political risk insurance for all 5 countries. ICSID arbitration clause in concession agreements. Multi-country structure reduces single-country exposure."
-            }
+        "break_even_analysis": break_evens,
+        "correlation_risks": corr_risks,
+        "conflict_context": conflict_context if conflict_context else "Conflict data unavailable",
+        "macro_context": macro_context if macro_context else "World Bank data unavailable",
+        "sovereign_risk_context": sovereign_risk_context if sovereign_risk_context else "Sovereign risk data unavailable",
+        "imf_macro_context": imf_macro_context if imf_macro_context else "IMF indicators unavailable",
+        "data_sources": [
+            "Financial model outputs",
+            "ACLED" if conflict_context else "ACLED (unavailable)",
+            "World Bank" if macro_context else "World Bank (unavailable)",
+            "TI CPI / V-Dem Governance" if sovereign_risk_context else "Sovereign Risk (unavailable)",
+            "IMF WEO" if imf_macro_context else "IMF (unavailable)",
         ],
-
-        # ------------------------------------------------------------------ #
-        #  RECOMMENDED ACTIONS BEFORE FINANCIAL CLOSE                         #
-        # ------------------------------------------------------------------ #
-        "pre_financial_close_actions": [
-            {
-                "priority": 1,
-                "action": "Execute take-or-pay off-take contracts with top 3 anchor loads",
-                "target_coverage": "Minimum 55% of Year 1 projected revenue under contract",
-                "responsible": "Commercial Development Team",
-                "deadline": "Before financial close — non-negotiable for lender sign-off"
-            },
-            {
-                "priority": 2,
-                "action": "Procure MIGA political risk insurance for all 5 corridor countries",
-                "target_coverage": "$270M commercial debt tranche",
-                "responsible": "Financing Team",
-                "deadline": "Month 6 — required for commercial lender credit approval"
-            },
-            {
-                "priority": 3,
-                "action": "Execute interest rate swap on commercial debt tranche",
-                "target": "Fix SOFR component to lock in current rate environment",
-                "responsible": "Treasury / Financial Advisor",
-                "deadline": "At financial close"
-            },
-            {
-                "priority": 4,
-                "action": "Establish 6-month debt service reserve account (DSRA)",
-                "amount_usd": 38_000_000,
-                "rationale": "Reduces covenant breach probability from 15.3% to ~6.8%",
-                "responsible": "Financing Team",
-                "deadline": "At financial close — standard lender requirement"
-            },
-            {
-                "priority": 5,
-                "action": "Negotiate USD-denominated tariff clauses for cross-border segments",
-                "target": "Eliminate local currency revenue exposure for Togo–Nigeria segments",
-                "responsible": "Legal and Regulatory Team",
-                "deadline": "Before concession agreements are signed"
-            }
-        ],
-
         "message": (
-            "Risk and sensitivity analysis complete across 12 variables with 10,000 Monte Carlo iterations. "
-            "Base case equity IRR: 15.1%. Probability of exceeding 14% target: 71.4%. P90 IRR: 11.2% — "
-            "above 10% DFI floor in worst decile. "
-            "CRITICAL FLAG: DSCR covenant breach probability is 15.3% — above the 10% lender comfort threshold. "
-            "Primary driver: anchor load revenue shortfall below 72% of base case. "
-            "Top risk: Anchor load realization (IRR swing of 7.1%) — "
-            "take-or-pay contracts covering 55%+ of Year 1 revenue must be executed before financial close. "
-            "Correlated risk alert: Currency devaluation + revenue shortfall co-movement (r=0.68) "
-            "creates a combined downside IRR of 9.4% — USD tariff structuring is critical. "
-            "Proceed to `optimize_debt_terms` to sculpt repayment profile to reduce trough-year DSCR stress, "
-            "then `model_credit_enhancement` to address the 15.3% covenant breach probability."
-        )
+            f"Risk analysis complete: {n_iterations} Monte Carlo iterations across {len(sensitivity_variables)} variables. "
+            f"Probability of exceeding {target_irr * 100:.0f}% target IRR: {prob_above_target * 100:.1f}%. "
+            f"P90 IRR: {irr_results[p10_idx] * 100:.1f}%. "
+            f"DSCR covenant breach probability: {prob_dscr_breach * 100:.1f}%. "
+            f"Top risk: {tornado[0]['variable']} (IRR swing: {tornado[0]['irr_swing']}). "
+            f"{'Conflict risk context available. ' if conflict_context else ''}"
+            f"{'Sovereign risk (CPI/governance) data injected into risk model. ' if sovereign_risk_context else ''}"
+            f"{'IMF macro forecasts available.' if imf_macro_context else ''}"
+        ),
     }
 
-    return Command(
-        update={
-            "messages": [
-                ToolMessage(
-                    content=json.dumps(response),
-                    tool_call_id=runtime.tool_call_id
-                )
-            ]
-        }
-    )
+    return Command(update={"messages": [ToolMessage(
+        content=json.dumps(response), tool_call_id=runtime.tool_call_id,
+    )]})

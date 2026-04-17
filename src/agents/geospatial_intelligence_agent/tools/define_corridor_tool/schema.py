@@ -9,5 +9,6 @@ class DefineCorridorInput(BaseModel):
     source: Coordinate = Field(description="The starting point coordinates")
     destination: Coordinate = Field(description="The ending point coordinates")
     buffer_width_km: float = Field(
-        description="The width of the corridor in kilometers (total width)"
+        default=50.0,
+        description="The width of the corridor in kilometers (total width). Defaults to 50km if not specified."
     )

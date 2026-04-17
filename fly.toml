@@ -1,0 +1,47 @@
+# fly.io deployment config for corridor-intelligence-platform-agents
+# Deploy: fly launch --copy-config --no-deploy  (first time)
+#         fly secrets set OPENAI_API_KEY=... GEMINI_API_KEY=... BACKEND_API_KEY=...
+#         fly deploy
+
+app = "corridor-agents"
+primary_region = "fra"   # Frankfurt — closest Fly region to West Africa
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  API_HOST = "0.0.0.0"
+  API_PORT = "8000"
+  ENABLE_DOCS = "false"
+  SCHEDULER_ENABLED = "true"
+  LOG_FORMAT = "json"
+  CORRIDOR_DATA_ROOT = "/data"
+  CORS_ORIGINS = "https://corridor-ui.vercel.app"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "15s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/healthz/live"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 2048
+
+[[mounts]]
+  source = "corridor_data"
+  destination = "/data"
+  initial_size = "10gb"
+
+[deploy]
+  strategy = "rolling"

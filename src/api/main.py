@@ -1,18 +1,151 @@
+"""
+Unified FastAPI application — Corridor Intelligence Platform.
+
+Merges pipeline data services (GEE, OSM, USGS, trade, etc.) with
+LangGraph agent workspace CRUD into a single deployable.
+"""
+
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.features.projects import router as projects_router
-from src.api.features.threads import router as threads_router
+import os
+
+from slowapi.errors import RateLimitExceeded
+
+from src.api.config import CORS_ORIGINS, SCHEDULER_ENABLED
 from src.api.schemas import error_response
+from src.api.security import ApiKeyMiddleware, limiter, rate_limit_handler
+from src.shared.pipeline.utils import setup_logging
 
-app = FastAPI()
+logger = logging.getLogger("corridor.api")
 
-app.include_router(projects_router, prefix="/workspace")
-app.include_router(threads_router, prefix="/workspace")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown logic."""
+    setup_logging()
+    logger.info("Starting Corridor Intelligence Platform API...")
+
+    # Initialize pipeline services
+    _services = [
+        "gee_service", "osm_service", "mineral_service", "trade_service",
+        "worldbank_service", "acled_service", "energy_service",
+        "livestock_service", "connectivity_service", "policy_service",
+        # Corridor enriched data (static imports)
+        "manufacturing_service", "stakeholders_registry_service",
+        "tourism_service", "agriculture_enriched_service",
+        "infrastructure_enriched_service", "macro_enriched_service",
+        "projects_enriched_service",
+        "geospatial_service",
+    ]
+    for svc_name in _services:
+        try:
+            import importlib
+            svc = importlib.import_module(f"src.api.services.{svc_name}")
+            svc.init()
+            logger.info("%s initialized", svc_name)
+        except Exception as exc:
+            logger.warning("%s failed to initialize: %s", svc_name, exc)
+
+    # Pre-warm GEE cache
+    try:
+        from src.api.services import gee_service
+        gee_service.prewarm_cache()
+    except Exception as exc:
+        logger.warning("Cache pre-warm failed: %s", exc)
+
+    # Check for missing data directories
+    from pathlib import Path
+    from src.shared.pipeline.utils import DATA_DIR
+
+    missing = []
+    for name in ("osm", "mineral", "trade", "worldbank"):
+        d = DATA_DIR / name
+        if not d.exists() or not any(d.iterdir()):
+            missing.append(f"data/{name}/")
+    if missing:
+        logger.warning(
+            "No data found in: %s. Endpoints will return empty results. "
+            "Run 'python run_all.py setup' to populate data.",
+            ", ".join(missing),
+        )
+
+    # Check data freshness
+    try:
+        from src.shared.pipeline.freshness import get_stale_pipelines, age_days
+        stale = get_stale_pipelines()
+        if stale:
+            ages = ", ".join(
+                f"{p} ({age_days(p):.0f}d)" if age_days(p) is not None else f"{p} (never)"
+                for p in stale
+            )
+            logger.warning(
+                "Stale data detected: %s. "
+                "Run 'python run_all.py refresh' to update only stale pipelines.",
+                ages,
+            )
+        else:
+            logger.info("All data pipelines are fresh")
+    except Exception as exc:
+        logger.debug("Freshness check skipped: %s", exc)
+
+    # Start background data scheduler
+    if SCHEDULER_ENABLED:
+        from src.scheduler.scheduler import data_scheduler
+        data_scheduler.start()
+        logger.info("Background data scheduler started")
+
+    logger.info("API startup complete")
+
+    yield
+
+    # Stop scheduler
+    if SCHEDULER_ENABLED:
+        from src.scheduler.scheduler import data_scheduler
+        data_scheduler.stop()
+
+    logger.info("API shutting down")
+
+
+_enable_docs = os.getenv("ENABLE_DOCS", "true").lower() in ("true", "1", "yes")
+
+app = FastAPI(
+    title="Corridor Intelligence Platform",
+    description="Lagos-Abidjan Economic Corridor — Data Pipelines, AI Agents & API",
+    version="0.2.0",
+    lifespan=lifespan,
+    docs_url="/api/docs" if _enable_docs else None,
+    redoc_url="/api/redoc" if _enable_docs else None,
+    openapi_url="/api/openapi.json" if _enable_docs else None,
+)
+
+# Rate limit registration (must precede routers)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+
+# API-key auth (no-op when BACKEND_API_KEY is unset — dev default)
+app.add_middleware(ApiKeyMiddleware)
+
+# CORS — tightened allow_methods/headers; * in CORS_ORIGINS should only be used in dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in CORS_ORIGINS if o.strip()],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "X-API-Key"],
+)
+
+
+# ── Exception handlers (from agents repo) ───────────────────────────────────
 
 @app.exception_handler(HTTPException)
-def http_exception_handler(request: Request, exc: HTTPException):
+async def http_exception_handler(request: Request, exc: HTTPException):
     """Return standard error shape for HTTP exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
@@ -21,14 +154,65 @@ def http_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.exception_handler(Exception)
-def unhandled_exception_handler(request: Request, exc: Exception):
+async def unhandled_exception_handler(request: Request, exc: Exception):
     """Return standard error shape for unhandled exceptions."""
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content=error_response(str(exc)),
+        content=error_response("Internal server error"),
     )
 
 
-@app.get("/hello")
-def read_root():
-    return {"success": True, "message": "Hello, World!", "data": None}
+# ── Pipeline routers ────────────────────────────────────────────────────────
+
+from src.api.routers import corridor, chat, infrastructure, trade, health, indicators, energy, acled, policy, dashboard
+from src.api.routers import (
+    manufacturing, stakeholders_registry, tourism,
+    agriculture_enriched, infrastructure_enriched, macro_enriched, projects_enriched,
+    geospatial,
+)
+
+app.include_router(corridor.router)       # /api/corridor/*
+app.include_router(chat.router)           # /api/chat
+app.include_router(infrastructure.router) # /api/roads, /api/minerals, etc.
+app.include_router(trade.router)          # /api/trade/*
+app.include_router(health.router)         # /api/health
+app.include_router(indicators.router)     # /api/indicators/*
+app.include_router(energy.router)         # /api/energy/*
+app.include_router(acled.router)          # /api/acled/*
+app.include_router(policy.router)         # /api/policy/*
+app.include_router(dashboard.router)      # /api/dashboard/*
+
+# Corridor enriched data routers
+app.include_router(manufacturing.router)           # /api/manufacturing/*
+app.include_router(stakeholders_registry.router)   # /api/stakeholders-registry/*
+app.include_router(tourism.router)                 # /api/tourism/*
+app.include_router(agriculture_enriched.router)    # /api/agriculture-enriched/*
+app.include_router(infrastructure_enriched.router) # /api/infrastructure-enriched/*
+app.include_router(macro_enriched.router)          # /api/macro-enriched/*
+app.include_router(projects_enriched.router)       # /api/projects-enriched/*
+app.include_router(geospatial.router)              # /api/geo/*
+
+# ── Workspace routers (from agents) ─────────────────────────────────────────
+
+from src.api.features.projects import router as projects_router
+from src.api.features.threads import router as threads_router
+from src.api.features.opportunities import router as opportunities_router
+
+app.include_router(projects_router, prefix="/workspace")
+app.include_router(threads_router, prefix="/workspace")
+app.include_router(opportunities_router, prefix="/workspace")
+
+
+# ── Root endpoint ────────────────────────────────────────────────────────────
+
+@app.get("/")
+async def root():
+    """Root endpoint — platform info."""
+    return {
+        "name": "Corridor Intelligence Platform",
+        "version": "0.2.0",
+        "docs": "/api/docs",
+        "health": "/api/health",
+        "workspace": "/workspace/projects",
+    }

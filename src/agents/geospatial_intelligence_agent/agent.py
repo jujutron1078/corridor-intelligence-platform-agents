@@ -1,11 +1,12 @@
 from langchain.agents import create_agent
 
-from src.shared.llm.llm_selector import default_llm, dynamic_model_selector
+from src.shared.agents.llm.llm_selector import default_llm, dynamic_model_selector
+from src.shared.agents.middleware.trim_context import trim_tool_messages
 from src.agents.geospatial_intelligence_agent.context.context import Context
 from src.agents.geospatial_intelligence_agent.middleware.inject_context import inject_context
 from src.agents.geospatial_intelligence_agent.prompts.prompt import agent_prompt
 from src.agents.geospatial_intelligence_agent.state.state import GeospatialIntelligenceAgentState
-from src.shared.tools import think_tool, write_todos
+from src.shared.agents.tools import think_tool, write_todos
 from src.agents.geospatial_intelligence_agent.tools.define_corridor_tool.tool import (
     define_corridor_tool,
 )
@@ -27,6 +28,9 @@ from src.agents.geospatial_intelligence_agent.tools.route_optimization_tool.tool
 from src.agents.geospatial_intelligence_agent.tools.terrain_analysis_tool.tool import (
     terrain_analysis_tool,
 )
+from src.agents.geospatial_intelligence_agent.tools.climate_risk_tool.tool import (
+    climate_risk_assessment,
+)
 
 agent = create_agent(
     model=default_llm,
@@ -40,11 +44,13 @@ agent = create_agent(
         infrastructure_detection_tool,
         environmental_constraints_tool,
         route_optimization_tool,
+        climate_risk_assessment,
     ],
     context_schema=Context,
     state_schema=GeospatialIntelligenceAgentState,
     middleware=[
         inject_context,
+        trim_tool_messages,
         agent_prompt,
         dynamic_model_selector,
     ],

@@ -145,6 +145,15 @@ All seven agents are registered in `langgraph.json` and in the Dockerfile `LANGS
 ## Development
 
 - **Dependencies:** See [Environment Setup → Install dependencies](#3-install-dependencies) above.
-- **Lint / format:** Use your preferred Python linter and formatter.  
-- **Adding an agent:** Add a new folder under `src/agents/` with the same structure (context, middleware, prompts, state), register it in `langgraph.json` and in the Dockerfile `LANGSERVE_GRAPHS`.  
+- **Lint / format:** Use your preferred Python linter and formatter.
+- **Adding an agent:** Add a new folder under `src/agents/` with the same structure (context, middleware, prompts, state), register it in `langgraph.json` and in the Dockerfile `LANGSERVE_GRAPHS`.
 - **Planning and milestones:** See [PLAN.MD](./PLAN.MD) for agent order, dependencies, and deliverables.
+
+## Data & Deployment
+
+This repo now hosts both the LangGraph agents AND the FastAPI data service (pipelines + routers + scheduler). The frontend is in `corridor_agent_ui`, and pulled data artifacts live in the private `corridor-data` manifest repo (R2 bucket).
+
+- **Deployment runbook:** [DEPLOYMENT.md](./DEPLOYMENT.md) — R2 setup, Fly.io, Vercel, Jenkins/K8s.
+- **Agent accuracy playbook:** [docs/AGENT_ACCURACY.md](./docs/AGENT_ACCURACY.md) — how to debug generic responses and missing map overlays.
+- **Climate risk scaffolding:** `src/pipelines/climate_pipeline/` and `src/agents/geospatial_intelligence_agent/tools/climate_risk_tool/` — drought, heat, coastal flood, composite hazard.
+- **Data hydration:** set `CORRIDOR_DATA_ROOT=/path/to/data` to read artifacts from a mounted R2 bucket or local mirror instead of `./data/`.

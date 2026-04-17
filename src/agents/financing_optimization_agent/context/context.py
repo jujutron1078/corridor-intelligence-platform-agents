@@ -1,10 +1,18 @@
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from src.shared.llm.models import SupportedLLM
+from src.shared.agents.llm.models import SupportedLLM
 
 
 class Context(BaseModel):
+    project_name: str = Field(
+        default="None",
+        description="The name of the project",
+    )
+    project_id: str = Field(
+        default="None",
+        description="The id of the project",
+    )
     user_name: str = Field(
         default="James Kanyiri",
         description="The name of the user",
@@ -28,7 +36,7 @@ class Context(BaseModel):
         )
     )
     preferred_llm: SupportedLLM = Field(
-        default="openai:gpt-5.2",
+        default="gpt-4o",
         description="The preferred LLM to use for the agent (all models support tool calling)",
     )
     llm_temperature: float = Field(

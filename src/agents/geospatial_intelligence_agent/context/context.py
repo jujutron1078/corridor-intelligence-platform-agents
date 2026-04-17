@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from src.shared.llm.models import SupportedLLM
+from src.shared.agents.llm.models import SupportedLLM
 
 
 class Context(BaseModel):
@@ -36,7 +36,7 @@ class Context(BaseModel):
         )
     )
     preferred_llm: SupportedLLM = Field(
-        default="openai:gpt-5.2",
+        default="gpt-4o",
         description="The preferred LLM to use for the agent (all models support tool calling)",
     )
     llm_temperature: float = Field(

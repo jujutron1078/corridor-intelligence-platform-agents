@@ -1,4 +1,6 @@
 import json
+import logging
+
 from langchain.tools import tool, ToolRuntime
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
@@ -6,303 +8,313 @@ from langgraph.types import Command
 from .description import TOOL_DESCRIPTION
 from .schema import FinancialModelInput
 
+logger = logging.getLogger("corridor.agent.financing.financial_model")
+
+# Financial model parameters
+PROJECTION_YEARS = 25
+CONSTRUCTION_YEARS = 4
+DEPRECIATION_YEARS = 25
+TAX_RATE = 0.25
+INFLATION = 0.025
+REVENUE_ESCALATION = 0.03
+OPEX_ESCALATION = 0.025
+OPEX_RATIO = 0.026  # 2.6% of CAPEX annually
+DSCR_COVENANT = 1.30
+
+# Revenue benchmarks per MW of connected demand
+REVENUE_PER_MW_YEAR1 = 145_000  # USD/MW/year (wheeling + capacity charges)
+
 
 @tool("build_financial_model", description=TOOL_DESCRIPTION)
 def build_financial_model_tool(
     payload: FinancialModelInput, runtime: ToolRuntime
 ) -> Command:
     """Calculates core financial metrics for the project lifecycle."""
+    from src.adapters.pipeline_bridge import pipeline_bridge
 
-    # In a real-world scenario, this tool would:
-    # 1. Build a full 3-statement model (P&L, Balance Sheet, Cash Flow Statement)
-    #    over a 25–30 year lifecycle, driven by revenue_projections and capex_opex_data.
-    # 2. Compute annual DSCR by dividing Cash Flow Available for Debt Service (CFADS)
-    #    by scheduled debt service (principal + interest) for each lender tranche.
-    # 3. Run a DCF using the WACC from the financing_structure to compute NPV.
-    # 4. Calculate equity IRR by modeling levered free cash flows to equity holders
-    #    after debt service, using the equity injection timing from the financing plan.
-    # 5. Calculate project IRR on unlevered free cash flows (pre-financing).
-    # 6. Identify the minimum DSCR year and flag if it breaches the 1.30x covenant floor.
-    # 7. Generate annual cash flow waterfall: Revenue → OPEX → EBITDA → Debt Service
-    #    → Tax → Equity distributions.
-    # 8. Produce a year-by-year summary table for lender reporting and investor decks.
+    # Extract financing structure
+    fin = payload.financing_structure or {}
+    capex_data = payload.capex_opex_data or {}
+    rev_projections = payload.revenue_projections or []
+
+    # Get real CAPEX from infrastructure or payload
+    total_capex = capex_data.get("total_capex_usd", 0)
+    if total_capex <= 0:
+        try:
+            corridor = pipeline_bridge.get_corridor_info()
+            total_km = corridor.get("length_km", 1080)
+            countries = corridor.get("countries", [])
+            total_capex = total_km * 980_000 + len(countries) * 50_000_000
+        except Exception as exc:
+            logger.warning("Corridor info unavailable: %s", exc)
+            total_capex = 900_000_000
+
+    # Get connected demand for revenue estimation
+    total_demand_mw = 0
+    try:
+        infra = pipeline_bridge.get_infrastructure_detections()
+        type_mw = {
+            "port_facility": 20.0, "airport": 15.0, "industrial_zone": 30.0,
+            "mineral_site": 25.0, "rail_network": 5.0, "border_crossing": 2.0,
+        }
+        for det in infra.get("detections", []):
+            dt = det.get("type", "other")
+            if dt != "power_plant":
+                total_demand_mw += type_mw.get(dt, 5.0)
+    except Exception as exc:
+        logger.warning("Infrastructure data unavailable: %s", exc)
+        total_demand_mw = 500
+
+    # Get IMF indicators for real GDP growth and macro assumptions
+    macro_assumptions = None
+    rev_escalation = REVENUE_ESCALATION  # local copy; may be overridden by IMF data
+    try:
+        imf = pipeline_bridge.get_imf_indicators()
+        if imf.get("status") == "ok" and imf.get("indicators"):
+            imf_indicators = imf["indicators"]
+            macro_assumptions = {
+                "indicators": imf_indicators,
+                "source": imf.get("source", "IMF WEO"),
+            }
+            # Use real GDP growth forecast for revenue escalation if available
+            # Look for an average GDP growth across corridor countries
+            gdp_growths = []
+            if isinstance(imf_indicators, dict):
+                for country_key, country_data in imf_indicators.items():
+                    if isinstance(country_data, dict):
+                        gdp_g = country_data.get("gdp_growth") or country_data.get("real_gdp_growth")
+                        if gdp_g is not None:
+                            try:
+                                gdp_growths.append(float(gdp_g) / 100 if float(gdp_g) > 1 else float(gdp_g))
+                            except (ValueError, TypeError):
+                                pass
+            if gdp_growths:
+                avg_gdp_growth = sum(gdp_growths) / len(gdp_growths)
+                # Use GDP growth as a proxy for revenue escalation (capped between 1-6%)
+                rev_escalation = max(0.01, min(0.06, avg_gdp_growth))
+                macro_assumptions["applied_revenue_escalation"] = round(rev_escalation, 4)
+    except Exception as exc:
+        logger.warning("IMF indicators unavailable: %s", exc)
+
+    # Get planned energy projects for generation pipeline context
+    energy_pipeline_context = None
+    try:
+        energy = pipeline_bridge.get_planned_energy_projects()
+        if energy.get("status") == "ok" and energy.get("projects"):
+            energy_pipeline_context = {
+                "project_count": len(energy["projects"]),
+                "capacity_summary": energy.get("capacity_summary", {}),
+                "sample_projects": [
+                    {
+                        "name": p.get("name") or p.get("title", "Untitled"),
+                        "country": p.get("country", "Unknown"),
+                        "capacity_mw": p.get("capacity_mw"),
+                        "fuel_type": p.get("fuel_type") or p.get("technology", "Unknown"),
+                        "status": p.get("status", "Unknown"),
+                    }
+                    for p in energy["projects"][:5]
+                ],
+                "source": energy.get("source", "Energy project database"),
+            }
+    except Exception as exc:
+        logger.warning("Planned energy projects unavailable: %s", exc)
+
+    # Build revenue trajectory if not provided
+    if not rev_projections or len(rev_projections) < PROJECTION_YEARS:
+        base_revenue = total_demand_mw * REVENUE_PER_MW_YEAR1
+        # Ramp-up: 40% Y1, 60% Y2, 80% Y3, 95% Y4, 100% Y5+
+        ramp = [0.40, 0.60, 0.80, 0.95] + [1.0] * (PROJECTION_YEARS - 4)
+        rev_projections = [
+            base_revenue * ramp[y] * (1 + rev_escalation) ** y
+            for y in range(PROJECTION_YEARS)
+        ]
+
+    # OPEX trajectory
+    base_opex = total_capex * OPEX_RATIO
+    opex_projections = [base_opex * (1 + OPEX_ESCALATION) ** y for y in range(PROJECTION_YEARS)]
+
+    # EBITDA
+    ebitda = [rev_projections[y] - opex_projections[y] for y in range(PROJECTION_YEARS)]
+
+    # Depreciation (straight-line)
+    annual_depreciation = total_capex / DEPRECIATION_YEARS
+
+    # Extract financing parameters
+    wacc = fin.get("wacc_raw", fin.get("wacc", 0.057))
+    if isinstance(wacc, str):
+        wacc = float(wacc.replace("%", "")) / 100
+
+    grants_usd = fin.get("grants_usd", total_capex * 0.10)
+    concessional_usd = fin.get("concessional_usd", total_capex * 0.45)
+    commercial_usd = fin.get("commercial_usd", total_capex * 0.30)
+    equity_usd = fin.get("equity_usd", total_capex * 0.15)
+    total_debt = concessional_usd + commercial_usd
+
+    # Estimate annual debt service (simplified sculpted profile)
+    conc_rate = 0.028
+    comm_rate = 0.083
+    conc_tenor = 25
+    comm_tenor = 15
+    grace = 5
+
+    # Cash flow waterfall for key years
+    waterfall = []
+    min_dscr = 999
+    min_dscr_year = 0
+    cfads_list = []
+    cumulative_equity_cf = [-equity_usd]  # initial equity outflow
+
+    for y in range(PROJECTION_YEARS):
+        rev = rev_projections[y]
+        opex = opex_projections[y]
+        ebitda_y = ebitda[y]
+        dep = annual_depreciation
+        ebit = ebitda_y - dep
+
+        # Interest
+        conc_outstanding = max(0, concessional_usd * (1 - max(0, y - grace) / conc_tenor))
+        comm_outstanding = max(0, commercial_usd * (1 - max(0, y - grace + 1) / comm_tenor))
+        interest = conc_outstanding * conc_rate + comm_outstanding * comm_rate
+
+        # Principal (after grace)
+        conc_principal = concessional_usd / conc_tenor if y >= grace else 0
+        comm_principal = commercial_usd / comm_tenor if y >= grace - 1 and y < grace - 1 + comm_tenor else 0
+        debt_service = interest + conc_principal + comm_principal
+
+        # CFADS
+        cfads_y = ebitda_y
+        cfads_list.append(cfads_y)
+
+        # DSCR
+        dscr_y = cfads_y / debt_service if debt_service > 0 else 99.0
+        if dscr_y < min_dscr:
+            min_dscr = dscr_y
+            min_dscr_year = y + 1
+
+        # Tax
+        ebt = ebit - interest
+        tax = max(0, ebt * TAX_RATE)
+        net_income = ebt - tax
+
+        # Equity distribution
+        equity_dist = max(0, cfads_y - debt_service - tax)
+        cumulative_equity_cf.append(equity_dist)
+
+        # Record key years
+        if y in [0, 2, 4, 9, 14, 24]:
+            waterfall.append({
+                "year": y + 1,
+                "revenue_usd": round(rev),
+                "opex_usd": round(opex),
+                "ebitda_usd": round(ebitda_y),
+                "ebitda_margin": f"{ebitda_y / rev * 100:.1f}%" if rev > 0 else "0%",
+                "debt_service_usd": round(debt_service),
+                "dscr": round(dscr_y, 2),
+                "tax_usd": round(tax),
+                "equity_distribution_usd": round(equity_dist),
+            })
+
+    # Compute NPV
+    npv = sum(ebitda[y] / (1 + wacc) ** (y + 1) for y in range(PROJECTION_YEARS)) - total_capex
+
+    # Estimate equity IRR (simplified)
+    equity_irr = _estimate_equity_irr(cumulative_equity_cf)
+
+    # Project IRR
+    project_cf = [-total_capex / CONSTRUCTION_YEARS] * CONSTRUCTION_YEARS + list(ebitda)
+    project_irr = _estimate_irr(project_cf)
+
+    # Payback period
+    cumulative = 0
+    payback = PROJECTION_YEARS
+    for y, cf in enumerate(ebitda):
+        cumulative += cf
+        if cumulative >= total_capex:
+            payback = y + 1
+            break
 
     response = {
-
-        # ------------------------------------------------------------------ #
-        #  MODEL CONFIGURATION                                                 #
-        #  Production: derived dynamically from payload inputs.               #
-        #  Mock: pre-set for Abidjan-Lagos $900M corridor infrastructure.     #
-        # ------------------------------------------------------------------ #
+        "corridor_id": "AL_CORRIDOR_001",
+        "analysis_type": "Financial Model — Project Finance DCF",
         "model_configuration": {
-            "model_type": "Project Finance DCF — 3-Statement",
-            "projection_period_years": 25,
-            "construction_period_years": 4,
-            "operations_start_year": 2029,
-            "base_currency": "USD",
-            "discount_rate_wacc": "5.66%",
-            "inflation_assumption": "2.5% per annum",
-            "revenue_escalation": "3.0% per annum (CPI-linked tariffs)",
-            "opex_escalation": "2.5% per annum",
-            "tax_rate": "25% (blended across 5 corridor countries)",
-            "depreciation_method": "Straight-line over 25 years",
-            "terminal_value_included": False,
-            "debt_sculpting": "DSCR-sculpted amortization aligned to cash flow ramp-up"
+            "projection_period_years": PROJECTION_YEARS,
+            "construction_period_years": CONSTRUCTION_YEARS,
+            "discount_rate_wacc": f"{wacc * 100:.2f}%",
+            "total_capex_usd": total_capex,
+            "connected_demand_mw": round(total_demand_mw, 1),
+            "tax_rate": f"{TAX_RATE * 100:.0f}%",
         },
-
-        # ------------------------------------------------------------------ #
-        #  CORE FINANCIAL METRICS                                              #
-        #  Production: computed from full DCF and levered/unlevered models.   #
-        #  Mock: pre-calculated for Scenario S-14 financing structure.        #
-        # ------------------------------------------------------------------ #
         "metrics": {
-            "equity_irr": "15.1%",
-            "project_irr": "10.3%",
-            "net_present_value_usd": 218_000_000,
-            "min_dscr": 1.42,
-            "avg_dscr": 1.71,
-            "max_dscr": 2.18,
-            "min_dscr_year": 2031,              # Year 3 of operations — ramp-up period
-            "payback_period_years": 11.5,
-            "break_even_year": 2037,            # Year 8 of operations
-            "equity_multiple": "2.8x",          # Total equity returned / equity invested
-            "target_equity_irr_met": True,
-            "dscr_covenant_met": True,          # Min DSCR 1.42x > 1.30x covenant floor
-            "npv_positive": True
+            "equity_irr": f"{equity_irr * 100:.1f}%",
+            "project_irr": f"{project_irr * 100:.1f}%",
+            "net_present_value_usd": round(npv),
+            "min_dscr": round(min_dscr, 2),
+            "min_dscr_year": min_dscr_year,
+            "payback_period_years": payback,
+            "total_debt_usd": round(total_debt),
+            "npv_positive": npv > 0,
+            "dscr_covenant_met": min_dscr >= DSCR_COVENANT,
         },
-
-        # ------------------------------------------------------------------ #
-        #  REVENUE MODEL                                                       #
-        #  Production: built from anchor load contracts + tariff schedules.   #
-        #  Mock: aggregated from 45–57 anchor loads identified in corridor.   #
-        # ------------------------------------------------------------------ #
-        "revenue_model": {
-            "revenue_streams": [
-                {
-                    "stream": "Transmission Wheeling Charges",
-                    "description": "Tariff charged per kWh transmitted across corridor grid",
-                    "year_1_revenue_usd": 38_000_000,
-                    "year_5_revenue_usd": 89_000_000,
-                    "year_10_revenue_usd": 148_000_000,
-                    "tariff_rate": "$0.018–0.024/kWh",
-                    "volume_year_1_gwh": 2_100,
-                    "volume_year_10_gwh": 7_400,
-                    "contract_type": "Use-of-system agreements with 5 national utilities",
-                    "off_take_certainty": "HIGH — regulated tariff, government-backed"
-                },
-                {
-                    "stream": "Capacity Reservation Charges",
-                    "description": "Fixed monthly charge for reserved transmission capacity by anchor loads",
-                    "year_1_revenue_usd": 22_000_000,
-                    "year_5_revenue_usd": 41_000_000,
-                    "year_10_revenue_usd": 63_000_000,
-                    "tariff_rate": "$8,500/MW/month reserved",
-                    "contracted_capacity_mw_year_1": 215,
-                    "contracted_capacity_mw_year_10": 620,
-                    "contract_type": "15-year capacity reservations (Dangote, Obuasi, Lekki FTZ)",
-                    "off_take_certainty": "HIGH — take-or-pay contracts with investment-grade counterparties"
-                },
-                {
-                    "stream": "Fiber Optic Leasing (Co-deployed)",
-                    "description": "Dark fiber and lit services leased to telecoms along corridor right-of-way",
-                    "year_1_revenue_usd": 8_000_000,
-                    "year_5_revenue_usd": 19_000_000,
-                    "year_10_revenue_usd": 31_000_000,
-                    "tariff_rate": "$4,200/km/year (dark fiber IRU)",
-                    "contract_type": "15–20 year Indefeasible Right of Use (IRU) agreements",
-                    "off_take_certainty": "MEDIUM — 3 LOIs signed, full contracts pending"
-                },
-                {
-                    "stream": "Ancillary Services (Frequency & Voltage)",
-                    "description": "Revenue from providing grid balancing services to WAPP and national utilities",
-                    "year_1_revenue_usd": 4_500_000,
-                    "year_5_revenue_usd": 11_000_000,
-                    "year_10_revenue_usd": 18_000_000,
-                    "contract_type": "Ancillary service agreements with WAPP",
-                    "off_take_certainty": "MEDIUM — subject to WAPP market development"
-                }
-            ],
-            "total_revenue_summary": {
-                "year_1_usd": 72_500_000,
-                "year_3_usd": 98_000_000,
-                "year_5_usd": 160_000_000,
-                "year_10_usd": 260_000_000,
-                "year_25_usd": 398_000_000,
-                "revenue_concentration_risk": "Top 3 anchor loads (Dangote, Lekki FTZ, Obuasi) represent 38% of Year 1 revenue — moderate concentration"
-            }
+        "revenue_summary": {
+            "year_1_usd": round(rev_projections[0]),
+            "year_5_usd": round(rev_projections[4]) if len(rev_projections) > 4 else 0,
+            "year_10_usd": round(rev_projections[9]) if len(rev_projections) > 9 else 0,
+            "year_25_usd": round(rev_projections[-1]),
         },
-
-        # ------------------------------------------------------------------ #
-        #  COST MODEL                                                          #
-        #  Production: built from Infrastructure agent CAPEX/OPEX outputs.   #
-        #  Mock: detailed for $900M Abidjan-Lagos transmission corridor.      #
-        # ------------------------------------------------------------------ #
-        "cost_model": {
-            "capex": {
-                "total_capex_usd": 900_000_000,
-                "co_location_savings_usd": 162_000_000,
-                "gross_capex_usd": 1_062_000_000,
-                "breakdown": {
-                    "transmission_lines_and_towers_usd": 490_000_000,
-                    "substations_usd": 210_000_000,
-                    "fiber_optic_co_deployment_usd": 42_000_000,
-                    "scada_and_control_systems_usd": 55_000_000,
-                    "environmental_and_social_usd": 62_000_000,
-                    "project_development_costs_usd": 18_000_000,
-                    "contingency_15pct_usd": 23_000_000
-                },
-                "capex_phasing": {
-                    "year_1_construction_usd": 180_000_000,
-                    "year_2_construction_usd": 270_000_000,
-                    "year_3_construction_usd": 315_000_000,
-                    "year_4_construction_usd": 135_000_000
-                }
-            },
-            "opex": {
-                "year_1_opex_usd": 19_500_000,
-                "year_5_opex_usd": 21_500_000,
-                "year_10_opex_usd": 24_800_000,
-                "breakdown": {
-                    "operations_and_maintenance_usd": 12_000_000,
-                    "insurance_usd": 3_200_000,
-                    "scada_and_it_systems_usd": 1_800_000,
-                    "management_and_admin_usd": 1_500_000,
-                    "environmental_monitoring_usd": 600_000,
-                    "regulatory_fees_usd": 400_000
-                },
-                "opex_as_pct_of_revenue_year_5": "13.4%"
-            }
-        },
-
-        # ------------------------------------------------------------------ #
-        #  ANNUAL CASH FLOW WATERFALL (Key Years)                              #
-        #  Production: full 25-year year-by-year table.                       #
-        #  Mock: representative years showing construction, ramp-up, steady.  #
-        # ------------------------------------------------------------------ #
-        "cash_flow_waterfall": {
-            "currency": "USD Millions",
-            "note": "Production model returns full 25-year annual table. Mock shows representative years.",
-            "years": [
-                {
-                    "year": 2029,
-                    "period": "Year 1 — Operations Ramp-up",
-                    "revenue": 72.5,
-                    "opex": -19.5,
-                    "ebitda": 53.0,
-                    "ebitda_margin": "73.1%",
-                    "depreciation": -36.0,
-                    "ebit": 17.0,
-                    "interest_expense": -38.2,
-                    "ebt": -21.2,
-                    "tax": 0.0,
-                    "net_income": -21.2,
-                    "add_back_depreciation": 36.0,
-                    "cfads": 53.0,
-                    "debt_service": -37.3,
-                    "dscr": 1.42,
-                    "equity_distribution": 0.0,
-                    "closing_cash_balance": 15.7
-                },
-                {
-                    "year": 2033,
-                    "period": "Year 5 — Stabilised Operations",
-                    "revenue": 160.0,
-                    "opex": -21.5,
-                    "ebitda": 138.5,
-                    "ebitda_margin": "86.6%",
-                    "depreciation": -36.0,
-                    "ebit": 102.5,
-                    "interest_expense": -29.4,
-                    "ebt": 73.1,
-                    "tax": -18.3,
-                    "net_income": 54.8,
-                    "add_back_depreciation": 36.0,
-                    "cfads": 138.5,
-                    "debt_service": -58.1,
-                    "dscr": 2.38,
-                    "equity_distribution": 48.0,
-                    "closing_cash_balance": 32.4
-                },
-                {
-                    "year": 2038,
-                    "period": "Year 10 — Full Capacity",
-                    "revenue": 260.0,
-                    "opex": -24.8,
-                    "ebitda": 235.2,
-                    "ebitda_margin": "90.5%",
-                    "depreciation": -36.0,
-                    "ebit": 199.2,
-                    "interest_expense": -18.6,
-                    "ebt": 180.6,
-                    "tax": -45.1,
-                    "net_income": 135.5,
-                    "add_back_depreciation": 36.0,
-                    "cfads": 235.2,
-                    "debt_service": -61.4,
-                    "dscr": 3.83,
-                    "equity_distribution": 120.0,
-                    "closing_cash_balance": 53.8
-                }
-            ]
-        },
-
-        # ------------------------------------------------------------------ #
-        #  DSCR PROFILE (Annual — Key Years)                                  #
-        #  Production: full annual DSCR table with per-tranche breakdown.     #
-        #  Mock: summary profile showing ramp-up, trough, and recovery.       #
-        # ------------------------------------------------------------------ #
-        "dscr_profile": {
-            "covenant_floor": 1.30,
-            "target_minimum": 1.40,
-            "years_below_covenant": 0,
-            "trough_year": 2031,
-            "trough_dscr": 1.42,
-            "trough_comment": "Year 3 of operations — ramp-up period before full anchor load realization",
-            "annual_summary": [
-                {"year": 2029, "dscr": 1.42, "status": "Above covenant"},
-                {"year": 2030, "dscr": 1.48, "status": "Above covenant"},
-                {"year": 2031, "dscr": 1.42, "status": "Above covenant — trough year"},
-                {"year": 2032, "dscr": 1.61, "status": "Recovering"},
-                {"year": 2033, "dscr": 2.38, "status": "Healthy"},
-                {"year": 2035, "dscr": 2.94, "status": "Strong"},
-                {"year": 2038, "dscr": 3.83, "status": "Post-refi optionality available"}
-            ]
-        },
-
-        # ------------------------------------------------------------------ #
-        #  MODEL STATUS AND READINESS                                          #
-        # ------------------------------------------------------------------ #
-        "status": {
-            "model_readiness": "Investor-grade model ready",
-            "lender_presentation_ready": True,
-            "equity_investor_ready": True,
-            "dfi_board_paper_ready": True,
-            "outstanding_items": [
-                "Anchor load off-take contracts (Dangote, Lekki FTZ) not yet executed — revenue line uses LOI assumptions",
-                "Nigeria tax treaty confirmation pending — 25% blended rate may reduce to 22% upon confirmation",
-                "WAPP ancillary services revenue assumes market operationalization by 2031 — subject to regulatory risk"
-            ]
-        },
-
+        "cash_flow_waterfall": waterfall,
+        "cfads_profile": [round(c) for c in cfads_list[:10]],
+        "macro_assumptions": macro_assumptions if macro_assumptions else "IMF macro data unavailable",
+        "energy_pipeline_context": energy_pipeline_context if energy_pipeline_context else "Planned energy project data unavailable",
+        "data_sources": [
+            "Corridor AOI",
+            "OSM + USGS infrastructure",
+            "DFI rate benchmarks",
+            "IMF WEO" if macro_assumptions else "IMF (unavailable)",
+            "Energy project database" if energy_pipeline_context else "Energy projects (unavailable)",
+        ],
         "message": (
-            "Full 25-year DCF model complete for $900M Abidjan-Lagos corridor infrastructure. "
-            "Core metrics: Equity IRR 15.1% (target: 14.0% ✓), Project IRR 10.3% (target: 9.0% ✓), "
-            "NPV $218M at 5.66% WACC (positive ✓), Min DSCR 1.42x in Year 3 (covenant floor: 1.30x ✓). "
-            "Payback period: 11.5 years. Equity multiple: 2.8x over 25-year life. "
-            "Model is investor-grade and ready for DFI board submission. "
-            "3 outstanding items flagged — anchor load contracts and Nigeria tax confirmation "
-            "are priority actions before financial close. "
-            "Proceed to `perform_risk_and_sensitivity_analysis` to stress-test these assumptions."
-        )
+            f"Financial model complete for ${total_capex / 1e6:,.0f}M CAPEX, "
+            f"{total_demand_mw:,.0f} MW connected demand. "
+            f"Equity IRR: {equity_irr * 100:.1f}%, Project IRR: {project_irr * 100:.1f}%, "
+            f"NPV: ${npv / 1e6:,.0f}M {'(positive)' if npv > 0 else '(negative)'}. "
+            f"Min DSCR: {min_dscr:.2f}x in Year {min_dscr_year} "
+            f"({'above' if min_dscr >= DSCR_COVENANT else 'BELOW'} {DSCR_COVENANT}x covenant). "
+            f"Payback: {payback} years."
+            + (f" Revenue escalation calibrated from IMF GDP growth forecasts ({macro_assumptions['applied_revenue_escalation']*100:.1f}%)." if macro_assumptions and macro_assumptions.get("applied_revenue_escalation") else "")
+            + (f" {energy_pipeline_context['project_count']} planned energy projects in corridor pipeline." if energy_pipeline_context else "")
+        ),
     }
 
-    return Command(
-        update={
-            "messages": [
-                ToolMessage(
-                    content=json.dumps(response),
-                    tool_call_id=runtime.tool_call_id
-                )
-            ]
-        }
-    )
+    return Command(update={"messages": [ToolMessage(
+        content=json.dumps(response), tool_call_id=runtime.tool_call_id,
+    )]})
+
+
+def _estimate_equity_irr(cash_flows: list[float]) -> float:
+    """Newton-Raphson IRR estimate for equity cash flows."""
+    if not cash_flows or all(cf == 0 for cf in cash_flows):
+        return 0.0
+    rate = 0.12
+    for _ in range(100):
+        npv = sum(cf / (1 + rate) ** t for t, cf in enumerate(cash_flows))
+        dnpv = sum(-t * cf / (1 + rate) ** (t + 1) for t, cf in enumerate(cash_flows))
+        if abs(dnpv) < 1e-10:
+            break
+        rate -= npv / dnpv
+        rate = max(min(rate, 1.0), -0.5)
+    return round(rate, 3)
+
+
+def _estimate_irr(cash_flows: list[float]) -> float:
+    """Newton-Raphson IRR estimate."""
+    if not cash_flows or all(cf == 0 for cf in cash_flows):
+        return 0.0
+    rate = 0.10
+    for _ in range(100):
+        npv = sum(cf / (1 + rate) ** t for t, cf in enumerate(cash_flows))
+        dnpv = sum(-t * cf / (1 + rate) ** (t + 1) for t, cf in enumerate(cash_flows))
+        if abs(dnpv) < 1e-10:
+            break
+        rate -= npv / dnpv
+        rate = max(min(rate, 1.0), -0.5)
+    return round(rate, 3)
