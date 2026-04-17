@@ -26,16 +26,44 @@ from src.shared.pipeline.utils import setup_logging
 logger = logging.getLogger("corridor.api")
 
 
-def _background_data_sync():
-    """Download pipeline data from R2 in a background thread (non-blocking)."""
+_SERVICE_NAMES = [
+    "gee_service", "osm_service", "mineral_service", "trade_service",
+    "worldbank_service", "acled_service", "energy_service",
+    "livestock_service", "connectivity_service", "policy_service",
+    "manufacturing_service", "stakeholders_registry_service",
+    "tourism_service", "agriculture_enriched_service",
+    "infrastructure_enriched_service", "macro_enriched_service",
+    "projects_enriched_service",
+    "geospatial_service",
+]
+
+
+def _init_services():
+    """Initialize all pipeline services (load data from disk into memory)."""
+    import importlib
+    for svc_name in _SERVICE_NAMES:
+        try:
+            svc = importlib.import_module(f"src.api.services.{svc_name}")
+            if hasattr(svc, 'init'):
+                svc.init()
+            logger.info("%s initialized", svc_name)
+        except Exception as exc:
+            logger.warning("%s failed to initialize: %s", svc_name, exc)
+
+
+def _background_data_sync_then_init():
+    """Download data from R2, THEN initialize services so they read real data."""
     import threading
-    def _sync():
+    def _work():
         try:
             from entrypoint_sync import sync
             sync()
+            logger.info("R2 sync done — now initializing services with real data...")
+            _init_services()
+            logger.info("Services re-initialized after data sync")
         except Exception as exc:
-            logger.warning("Background data sync failed: %s", exc)
-    t = threading.Thread(target=_sync, daemon=True, name="r2-data-sync")
+            logger.warning("Background data sync/init failed: %s", exc)
+    t = threading.Thread(target=_work, daemon=True, name="r2-sync-then-init")
     t.start()
     return t
 
@@ -46,28 +74,16 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("Starting Corridor Intelligence Platform API...")
 
-    _background_data_sync()
+    from pathlib import Path
+    from src.shared.pipeline.utils import DATA_DIR
+    data_exists = (DATA_DIR / "freshness.json").exists()
 
-    # Initialize pipeline services
-    _services = [
-        "gee_service", "osm_service", "mineral_service", "trade_service",
-        "worldbank_service", "acled_service", "energy_service",
-        "livestock_service", "connectivity_service", "policy_service",
-        # Corridor enriched data (static imports)
-        "manufacturing_service", "stakeholders_registry_service",
-        "tourism_service", "agriculture_enriched_service",
-        "infrastructure_enriched_service", "macro_enriched_service",
-        "projects_enriched_service",
-        "geospatial_service",
-    ]
-    for svc_name in _services:
-        try:
-            import importlib
-            svc = importlib.import_module(f"src.api.services.{svc_name}")
-            svc.init()
-            logger.info("%s initialized", svc_name)
-        except Exception as exc:
-            logger.warning("%s failed to initialize: %s", svc_name, exc)
+    if data_exists:
+        logger.info("Data found at %s — initializing services immediately", DATA_DIR)
+        _init_services()
+    else:
+        logger.info("No data at %s — syncing from R2 in background, services will init after", DATA_DIR)
+        _background_data_sync_then_init()
 
     # Pre-warm GEE cache
     try:
