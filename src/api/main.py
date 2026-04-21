@@ -287,12 +287,12 @@ async def data_status():
 
 @app.post("/api/admin/trigger-sync")
 async def trigger_sync():
-    """Manually trigger R2 data sync + service re-init (background)."""
+    """Manually trigger R2 data sync + service re-init (background). Always forces full sync."""
     import threading
     def _do():
         try:
             from entrypoint_sync import sync
-            sync()
+            sync(force=True)
             logger.info("Manual sync done — re-initializing services...")
 
             _init_services()

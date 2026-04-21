@@ -5,11 +5,11 @@ import logging
 logger = logging.getLogger("corridor.sync")
 
 
-def sync():
+def sync(force=False):
     data_dir = os.environ.get("CORRIDOR_DATA_ROOT", "/data")
     marker = os.path.join(data_dir, "freshness.json")
 
-    if os.path.exists(marker):
+    if os.path.exists(marker) and not force:
         logger.info("Data found at %s — skipping sync.", data_dir)
         return
 
@@ -59,13 +59,23 @@ def sync():
                 local_path = os.path.join(data_dir, rel_path)
                 os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
+                # Skip if file already exists and has same size
+                if not force and os.path.exists(local_path):
+                    local_size = os.path.getsize(local_path)
+                    if local_size == obj.get("Size", -1):
+                        downloaded += 1
+                        continue
+
                 try:
+                    size_mb = obj.get("Size", 0) / 1e6
+                    if size_mb > 10:
+                        logger.info("  downloading %s (%.0f MB)...", rel_path, size_mb)
                     s3.download_file(bucket, key, local_path)
                     downloaded += 1
                     if downloaded % 50 == 0:
                         logger.info("  ... downloaded %d files", downloaded)
                 except Exception as e:
-                    logger.warning("Failed to download %s: %s", key, e)
+                    logger.warning("Failed to download %s (%.0f MB): %s", key, obj.get("Size", 0) / 1e6, e)
                     errors += 1
 
         logger.info("R2 sync complete: %d files downloaded, %d errors", downloaded, errors)
