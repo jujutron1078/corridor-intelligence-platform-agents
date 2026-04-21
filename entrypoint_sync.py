@@ -32,13 +32,25 @@ def sync(force=False):
     logger.info("Syncing data from R2 to %s ...", data_dir)
     os.makedirs(data_dir, exist_ok=True)
 
+    from boto3.s3.transfer import TransferConfig
+
     s3 = boto3.client(
         "s3",
         endpoint_url=endpoint,
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
-        config=Config(signature_version="s3v4"),
+        config=Config(
+            signature_version="s3v4",
+            retries={"max_attempts": 3, "mode": "adaptive"},
+        ),
         region_name="auto",
+    )
+
+    # Multipart download for large files — 8 MB chunks, 4 threads
+    transfer_config = TransferConfig(
+        multipart_threshold=8 * 1024 * 1024,
+        max_concurrency=4,
+        multipart_chunksize=8 * 1024 * 1024,
     )
 
     bucket = "corridor-data"
@@ -70,7 +82,7 @@ def sync(force=False):
                     size_mb = obj.get("Size", 0) / 1e6
                     if size_mb > 10:
                         logger.info("  downloading %s (%.0f MB)...", rel_path, size_mb)
-                    s3.download_file(bucket, key, local_path)
+                    s3.download_file(bucket, key, local_path, Config=transfer_config)
                     downloaded += 1
                     if downloaded % 50 == 0:
                         logger.info("  ... downloaded %d files", downloaded)
