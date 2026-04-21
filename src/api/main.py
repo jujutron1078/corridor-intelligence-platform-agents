@@ -93,9 +93,6 @@ async def lifespan(app: FastAPI):
         logger.warning("Cache pre-warm failed: %s", exc)
 
     # Check for missing data directories
-    from pathlib import Path
-    from src.shared.pipeline.utils import DATA_DIR
-
     missing = []
     for name in ("osm", "mineral", "trade", "worldbank"):
         d = DATA_DIR / name
