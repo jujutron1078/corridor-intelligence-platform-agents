@@ -304,10 +304,10 @@ async def trigger_sync():
     return {"status": "sync started in background", "note": "Check /api/admin/data-status in a few minutes"}
 
 
-@app.get("/api/admin/test-rclone")
-async def test_rclone():
-    """Run rclone ls to verify R2 connectivity — returns actual errors."""
-    import subprocess, traceback
+@app.get("/api/admin/test-r2")
+async def test_r2():
+    """Test R2 connectivity via boto3 — returns actual errors."""
+    import traceback
 
     try:
         access_key = os.environ.get("R2_ACCESS_KEY", "")
@@ -316,28 +316,26 @@ async def test_rclone():
         data_dir = os.environ.get("CORRIDOR_DATA_ROOT", "/data")
 
         if not all([access_key, secret_key, endpoint]):
-            return {"error": "R2 credentials not set", "access_key_set": bool(access_key), "secret_key_set": bool(secret_key), "endpoint_set": bool(endpoint)}
+            return {"error": "R2 credentials not set"}
 
-        remote = f":s3,provider=Cloudflare,access_key_id={access_key},secret_access_key={secret_key},endpoint={endpoint}:corridor-data/v1/data"
+        import boto3
+        from botocore.config import Config
 
-        # Test 1: is rclone binary there?
-        import shutil
-        rclone_path = shutil.which("rclone")
-        if not rclone_path:
-            return {"error": "rclone binary not found in PATH"}
-
-        # Test 2: list top-level dirs in R2
-        result = subprocess.run(
-            ["rclone", "lsd", remote],
-            capture_output=True, text=True, timeout=60
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            config=Config(signature_version="s3v4"),
+            region_name="auto",
         )
 
-        if result.returncode != 0:
-            return {"error": "rclone lsd failed", "stderr": result.stderr[:1000], "stdout": result.stdout[:500], "returncode": result.returncode}
+        # List top-level "directories" under v1/data/
+        resp = s3.list_objects_v2(Bucket="corridor-data", Prefix="v1/data/", Delimiter="/", MaxKeys=30)
+        prefixes = [p["Prefix"] for p in resp.get("CommonPrefixes", [])]
+        obj_count = resp.get("KeyCount", 0)
 
-        r2_dirs = result.stdout.strip().split("\n") if result.stdout.strip() else []
-
-        # Test 3: check data_dir writability
+        # Check data_dir writability
         writable = True
         write_error = None
         try:
@@ -350,10 +348,10 @@ async def test_rclone():
             write_error = str(e)
 
         return {
-            "rclone_binary": rclone_path,
-            "rclone_works": True,
-            "r2_dirs_found": len(r2_dirs),
-            "r2_top_level": r2_dirs[:15],
+            "r2_connected": True,
+            "r2_dirs_found": len(prefixes),
+            "r2_top_level": prefixes,
+            "r2_objects_in_page": obj_count,
             "data_dir": data_dir,
             "data_dir_writable": writable,
             "write_error": write_error,

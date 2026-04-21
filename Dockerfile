@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdal-dev \
     libgeos-dev \
     libproj-dev \
-    rclone \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,6 +18,7 @@ RUN pip install --no-cache-dir -e ".[all]"
 # Copy source
 COPY . .
 RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir boto3
 
 ENV CORRIDOR_DATA_ROOT=/data
 RUN mkdir -p /data
