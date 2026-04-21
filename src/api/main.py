@@ -287,13 +287,14 @@ async def data_status():
 
 @app.post("/api/admin/trigger-sync")
 async def trigger_sync():
-    """Manually trigger R2 data sync + service re-init."""
+    """Manually trigger R2 data sync + service re-init (background)."""
     import threading
     def _do():
         try:
             from entrypoint_sync import sync
             sync()
             logger.info("Manual sync done — re-initializing services...")
+
             _init_services()
             logger.info("Services re-initialized after manual sync")
         except Exception as exc:
@@ -301,3 +302,49 @@ async def trigger_sync():
     t = threading.Thread(target=_do, daemon=True, name="manual-sync")
     t.start()
     return {"status": "sync started in background", "note": "Check /api/admin/data-status in a few minutes"}
+
+
+@app.get("/api/admin/test-rclone")
+async def test_rclone():
+    """Run rclone ls to verify R2 connectivity — returns actual errors."""
+    import subprocess
+
+    access_key = os.environ.get("R2_ACCESS_KEY", "")
+    secret_key = os.environ.get("R2_SECRET_KEY", "")
+    endpoint = os.environ.get("R2_ENDPOINT", "")
+    data_dir = os.environ.get("CORRIDOR_DATA_ROOT", "/data")
+
+    if not all([access_key, secret_key, endpoint]):
+        return {"error": "R2 credentials not set", "access_key_set": bool(access_key), "secret_key_set": bool(secret_key), "endpoint_set": bool(endpoint)}
+
+    remote = f":s3,provider=Cloudflare,access_key_id={access_key},secret_access_key={secret_key},endpoint={endpoint}:corridor-data/v1/data"
+
+    # Test: list top-level dirs in R2
+    result = subprocess.run(
+        ["rclone", "lsd", remote],
+        capture_output=True, text=True, timeout=30
+    )
+
+    if result.returncode != 0:
+        return {"error": "rclone lsd failed", "stderr": result.stderr, "returncode": result.returncode}
+
+    r2_dirs = result.stdout.strip().split("\n") if result.stdout.strip() else []
+
+    # Test: check data_dir writability
+    import tempfile
+    try:
+        test_file = os.path.join(data_dir, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+        writable = True
+    except Exception as e:
+        writable = str(e)
+
+    return {
+        "rclone_works": True,
+        "r2_dirs_found": len(r2_dirs),
+        "r2_top_level": r2_dirs[:10],
+        "data_dir": data_dir,
+        "data_dir_writable": writable,
+    }
