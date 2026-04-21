@@ -248,3 +248,56 @@ async def root():
         "health": "/api/health",
         "workspace": "/workspace/projects",
     }
+
+
+@app.get("/api/admin/data-status")
+async def data_status():
+    """Diagnostic: check /data contents and R2 sync status."""
+    import subprocess, shutil
+    from pathlib import Path
+    from src.shared.pipeline.utils import DATA_DIR
+
+    data_path = Path(DATA_DIR)
+    contents = []
+    if data_path.exists():
+        for item in sorted(data_path.iterdir()):
+            if item.is_dir():
+                file_count = sum(1 for _ in item.rglob("*") if _.is_file())
+                size_mb = sum(f.stat().st_size for f in item.rglob("*") if f.is_file()) / 1e6
+                contents.append({"name": item.name, "files": file_count, "size_mb": round(size_mb, 1)})
+            else:
+                contents.append({"name": item.name, "files": 1, "size_mb": round(item.stat().st_size / 1e6, 1)})
+
+    rclone_ok = shutil.which("rclone") is not None
+    r2_key = bool(os.environ.get("R2_ACCESS_KEY"))
+    r2_secret = bool(os.environ.get("R2_SECRET_KEY"))
+    r2_endpoint = bool(os.environ.get("R2_ENDPOINT"))
+    freshness = (data_path / "freshness.json").exists()
+
+    return {
+        "data_dir": str(data_path),
+        "data_dir_exists": data_path.exists(),
+        "freshness_json_exists": freshness,
+        "pipeline_dirs": contents,
+        "total_items": len(contents),
+        "rclone_installed": rclone_ok,
+        "r2_credentials_set": {"access_key": r2_key, "secret_key": r2_secret, "endpoint": r2_endpoint},
+    }
+
+
+@app.post("/api/admin/trigger-sync")
+async def trigger_sync():
+    """Manually trigger R2 data sync + service re-init."""
+    import threading
+    def _do():
+        try:
+            from entrypoint_sync import sync
+            sync()
+            logger.info("Manual sync done — re-initializing services...")
+            _init_services()
+            logger.info("Services re-initialized after manual sync")
+        except Exception as exc:
+            logger.error("Manual sync failed: %s", exc, exc_info=True)
+    t = threading.Thread(target=_do, daemon=True, name="manual-sync")
+    t.start()
+    return {"status": "sync started in background", "note": "Check /api/admin/data-status in a few minutes"}
