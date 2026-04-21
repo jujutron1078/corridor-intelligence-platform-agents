@@ -307,44 +307,56 @@ async def trigger_sync():
 @app.get("/api/admin/test-rclone")
 async def test_rclone():
     """Run rclone ls to verify R2 connectivity — returns actual errors."""
-    import subprocess
+    import subprocess, traceback
 
-    access_key = os.environ.get("R2_ACCESS_KEY", "")
-    secret_key = os.environ.get("R2_SECRET_KEY", "")
-    endpoint = os.environ.get("R2_ENDPOINT", "")
-    data_dir = os.environ.get("CORRIDOR_DATA_ROOT", "/data")
-
-    if not all([access_key, secret_key, endpoint]):
-        return {"error": "R2 credentials not set", "access_key_set": bool(access_key), "secret_key_set": bool(secret_key), "endpoint_set": bool(endpoint)}
-
-    remote = f":s3,provider=Cloudflare,access_key_id={access_key},secret_access_key={secret_key},endpoint={endpoint}:corridor-data/v1/data"
-
-    # Test: list top-level dirs in R2
-    result = subprocess.run(
-        ["rclone", "lsd", remote],
-        capture_output=True, text=True, timeout=30
-    )
-
-    if result.returncode != 0:
-        return {"error": "rclone lsd failed", "stderr": result.stderr, "returncode": result.returncode}
-
-    r2_dirs = result.stdout.strip().split("\n") if result.stdout.strip() else []
-
-    # Test: check data_dir writability
-    import tempfile
     try:
-        test_file = os.path.join(data_dir, ".write_test")
-        with open(test_file, "w") as f:
-            f.write("test")
-        os.remove(test_file)
-        writable = True
-    except Exception as e:
-        writable = str(e)
+        access_key = os.environ.get("R2_ACCESS_KEY", "")
+        secret_key = os.environ.get("R2_SECRET_KEY", "")
+        endpoint = os.environ.get("R2_ENDPOINT", "")
+        data_dir = os.environ.get("CORRIDOR_DATA_ROOT", "/data")
 
-    return {
-        "rclone_works": True,
-        "r2_dirs_found": len(r2_dirs),
-        "r2_top_level": r2_dirs[:10],
-        "data_dir": data_dir,
-        "data_dir_writable": writable,
-    }
+        if not all([access_key, secret_key, endpoint]):
+            return {"error": "R2 credentials not set", "access_key_set": bool(access_key), "secret_key_set": bool(secret_key), "endpoint_set": bool(endpoint)}
+
+        remote = f":s3,provider=Cloudflare,access_key_id={access_key},secret_access_key={secret_key},endpoint={endpoint}:corridor-data/v1/data"
+
+        # Test 1: is rclone binary there?
+        import shutil
+        rclone_path = shutil.which("rclone")
+        if not rclone_path:
+            return {"error": "rclone binary not found in PATH"}
+
+        # Test 2: list top-level dirs in R2
+        result = subprocess.run(
+            ["rclone", "lsd", remote],
+            capture_output=True, text=True, timeout=60
+        )
+
+        if result.returncode != 0:
+            return {"error": "rclone lsd failed", "stderr": result.stderr[:1000], "stdout": result.stdout[:500], "returncode": result.returncode}
+
+        r2_dirs = result.stdout.strip().split("\n") if result.stdout.strip() else []
+
+        # Test 3: check data_dir writability
+        writable = True
+        write_error = None
+        try:
+            test_file = os.path.join(data_dir, ".write_test")
+            with open(test_file, "w") as f:
+                f.write("test")
+            os.remove(test_file)
+        except Exception as e:
+            writable = False
+            write_error = str(e)
+
+        return {
+            "rclone_binary": rclone_path,
+            "rclone_works": True,
+            "r2_dirs_found": len(r2_dirs),
+            "r2_top_level": r2_dirs[:15],
+            "data_dir": data_dir,
+            "data_dir_writable": writable,
+            "write_error": write_error,
+        }
+    except Exception as exc:
+        return {"error": str(exc), "traceback": traceback.format_exc()}
