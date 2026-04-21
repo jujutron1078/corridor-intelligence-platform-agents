@@ -58,6 +58,10 @@ def sync(force=False):
     downloaded = 0
     errors = 0
 
+    # Skip large raster dirs that exceed Railway's 500 MB volume limit.
+    # These are non-essential for the main map/dashboards.
+    SKIP_PREFIXES = {"v1/data/connectivity/", "v1/data/livestock/"}
+
     try:
         paginator = s3.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
@@ -66,6 +70,10 @@ def sync(force=False):
                 # Strip prefix to get relative path
                 rel_path = key[len(prefix):]
                 if not rel_path or rel_path.endswith("/"):
+                    continue
+
+                # Skip large non-essential dirs
+                if any(key.startswith(sp) for sp in SKIP_PREFIXES):
                     continue
 
                 local_path = os.path.join(data_dir, rel_path)
